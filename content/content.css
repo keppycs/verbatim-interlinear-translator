@@ -61,8 +61,3 @@
   z-index: 2147483646;
   pointer-events: none;
 }
-
-[data-vit-root] .vit-gloss.vit-gloss--pending {
-  opacity: 0.55;
-  font-style: italic;
-}
