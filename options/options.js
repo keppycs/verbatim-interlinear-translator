@@ -2,13 +2,13 @@ import { BackendId } from "../lib/translation/constants.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
 
 const backendLabels = [
-  [BackendId.AUTO, "Auto (priority chain)"],
-  [BackendId.DEEPL, "DeepL only"],
-  [BackendId.GOOGLE, "Google Cloud Translation only"],
-  [BackendId.AZURE, "Azure Translator only"],
-  [BackendId.LIBRETRANSLATE, "LibreTranslate only"],
-  [BackendId.CUSTOM, "Custom endpoint only"],
-  [BackendId.ONDEVICE, "On-device only (not implemented)"],
+  [BackendId.AUTO, "Auto"],
+  [BackendId.DEEPL, "DeepL"],
+  [BackendId.GOOGLE, "Google Cloud Translation"],
+  [BackendId.AZURE, "Azure Translator"],
+  [BackendId.LIBRETRANSLATE, "LibreTranslate"],
+  [BackendId.CUSTOM, "Custom endpoint"],
+  [BackendId.ONDEVICE, "On-device (not implemented)"],
 ];
 
 function fillBackendSelect() {
@@ -31,7 +31,8 @@ function formToObject() {
     azureTranslatorRegion: document.getElementById("azureTranslatorRegion").value.trim(),
     libreTranslateBaseUrl: document.getElementById("libreTranslateBaseUrl").value.trim(),
     customTranslateBaseUrl: document.getElementById("customTranslateBaseUrl").value.trim(),
-    customTranslatePath: document.getElementById("customTranslatePath").value.trim() || "/translate",
+    customTranslatePath:
+      document.getElementById("customTranslatePath").value.trim() || "/translate",
     layoutMode: document.getElementById("layoutMode").value,
   };
 }

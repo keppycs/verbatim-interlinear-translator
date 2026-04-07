@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -15,8 +15,9 @@
             <p class="eyebrow">Extension settings</p>
             <h1>Verbatim Interlinear Translator</h1>
             <p class="tagline">
-              Connect translation providers and choose how glosses sit on the page. Pick source and target languages in the toolbar menu,
-              then use the switch there to translate the whole tab.
+              Connect translation providers and choose how glosses sit on the page. Pick source and
+              target languages in the toolbar menu, then use the switch there to translate the whole
+              tab.
             </p>
           </div>
         </div>
@@ -30,31 +31,9 @@
                 <h2 id="h-backend">Translation backend</h2>
               </div>
               <p class="hint">
-                <strong>Auto</strong> tries providers in order: DeepL → Google Cloud Translation → Azure → LibreTranslate (URL) → Custom
-                (URL) → on-device (when available). Get API keys:
-                <span class="hint-links">
-                  <a
-                    class="hint-link"
-                    href="https://developers.deepl.com/docs/getting-started/auth"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >DeepL</a
-                  ><span class="hint-sep" aria-hidden="true">·</span
-                  ><a
-                    class="hint-link"
-                    href="https://console.cloud.google.com/apis/credentials"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >Google</a
-                  ><span class="hint-sep" aria-hidden="true">·</span
-                  ><a
-                    class="hint-link"
-                    href="https://learn.microsoft.com/en-us/azure/ai-services/translator/how-to-create-translator"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >Azure</a
-                  >
-                </span>
+                <strong>Auto</strong> tries providers in order: DeepL → Google Cloud Translation →
+                Azure → LibreTranslate (URL) → Custom (URL) → on-device (when available). Get API
+                keys:
               </p>
               <label class="field">
                 <span class="field-label">Backend</span>
@@ -140,11 +119,21 @@
               </div>
               <label class="field">
                 <span class="field-label">Key</span>
-                <input type="password" id="azureTranslatorKey" name="azureTranslatorKey" autocomplete="off" />
+                <input
+                  type="password"
+                  id="azureTranslatorKey"
+                  name="azureTranslatorKey"
+                  autocomplete="off"
+                />
               </label>
               <label class="field">
                 <span class="field-label">Region (if required)</span>
-                <input type="text" id="azureTranslatorRegion" name="azureTranslatorRegion" placeholder="e.g. eastus" />
+                <input
+                  type="text"
+                  id="azureTranslatorRegion"
+                  name="azureTranslatorRegion"
+                  placeholder="e.g. eastus"
+                />
               </label>
             </section>
           </div>
@@ -163,7 +152,12 @@
               </div>
               <label class="field">
                 <span class="field-label">Base URL</span>
-                <input type="url" id="libreTranslateBaseUrl" name="libreTranslateBaseUrl" placeholder="http://localhost:5000" />
+                <input
+                  type="url"
+                  id="libreTranslateBaseUrl"
+                  name="libreTranslateBaseUrl"
+                  placeholder="http://localhost:5000"
+                />
               </label>
             </section>
 
@@ -179,12 +173,18 @@
                 >
               </div>
               <p class="hint">
-                POST JSON like LibreTranslate: <code>{ q, source, target, format }</code> → <code>{ translatedText }</code>.
+                POST JSON like LibreTranslate: <code>{ q, source, target, format }</code> →
+                <code>{ translatedText }</code>.
               </p>
               <div class="pair pair--endpoint">
                 <label class="field">
                   <span class="field-label">Base URL</span>
-                  <input type="url" id="customTranslateBaseUrl" name="customTranslateBaseUrl" placeholder="https://api.example.com" />
+                  <input
+                    type="url"
+                    id="customTranslateBaseUrl"
+                    name="customTranslateBaseUrl"
+                    placeholder="https://api.example.com"
+                  />
                 </label>
                 <label class="field field--path">
                   <span class="field-label">Path</span>

@@ -213,7 +213,7 @@ html {
 
 .hint strong {
   color: var(--vit-text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .hint code {
