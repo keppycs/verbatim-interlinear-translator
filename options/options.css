@@ -134,12 +134,77 @@ body {
   background: var(--vit-surface-hover);
 }
 
-.panel h2 {
-  margin: 0 0 0.85rem;
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.panel-head h2 {
+  margin: 0;
   font-size: 0.8125rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--vit-text);
+}
+
+.panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--vit-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.panel-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.panel-link:focus-visible {
+  outline: 2px solid var(--vit-ring);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.panel-link .ext {
+  font-size: 0.95em;
+  opacity: 0.9;
+}
+
+.panel-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 1rem;
+}
+
+.hint-links {
+  display: inline;
+}
+
+.hint-link {
+  font-weight: 600;
+  color: var(--vit-accent);
+  text-decoration: none;
+}
+
+.hint-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.hint-sep {
+  margin: 0 0.2em;
+  color: var(--vit-muted);
+  user-select: none;
 }
 
 .hint {

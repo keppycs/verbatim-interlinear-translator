@@ -25,10 +25,35 @@
         <div class="app-grid">
           <div class="stack">
             <section class="panel" aria-labelledby="h-backend">
-              <h2 id="h-backend">Translation backend</h2>
+              <div class="panel-head">
+                <h2 id="h-backend">Translation backend</h2>
+              </div>
               <p class="hint">
                 <strong>Auto</strong> tries providers in order: DeepL → Google Cloud Translation → Azure → LibreTranslate (URL) → Custom
-                (URL) → on-device (when available).
+                (URL) → on-device (when available). Get API keys:
+                <span class="hint-links">
+                  <a
+                    class="hint-link"
+                    href="https://developers.deepl.com/docs/getting-started/auth"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >DeepL</a
+                  ><span class="hint-sep" aria-hidden="true">·</span
+                  ><a
+                    class="hint-link"
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Google</a
+                  ><span class="hint-sep" aria-hidden="true">·</span
+                  ><a
+                    class="hint-link"
+                    href="https://learn.microsoft.com/en-us/azure/ai-services/translator/how-to-create-translator"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Azure</a
+                  >
+                </span>
               </p>
               <label class="field">
                 <span class="field-label">Backend</span>
@@ -37,7 +62,25 @@
             </section>
 
             <section class="panel" aria-labelledby="h-deepl">
-              <h2 id="h-deepl">DeepL API</h2>
+              <div class="panel-head">
+                <h2 id="h-deepl">DeepL API</h2>
+                <div class="panel-links">
+                  <a
+                    class="panel-link"
+                    href="https://www.deepl.com/account"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >API key (account) <span class="ext" aria-hidden="true">↗</span></a
+                  >
+                  <a
+                    class="panel-link"
+                    href="https://developers.deepl.com/docs/getting-started/auth"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Auth docs <span class="ext" aria-hidden="true">↗</span></a
+                  >
+                </div>
+              </div>
               <label class="field">
                 <span class="field-label">Auth key</span>
                 <input type="password" id="deeplAuthKey" name="deeplAuthKey" autocomplete="off" />
@@ -49,7 +92,25 @@
             </section>
 
             <section class="panel" aria-labelledby="h-google">
-              <h2 id="h-google">Google Cloud Translation</h2>
+              <div class="panel-head">
+                <h2 id="h-google">Google Cloud Translation</h2>
+                <div class="panel-links">
+                  <a
+                    class="panel-link"
+                    href="https://console.cloud.google.com/apis/library/translate.googleapis.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Enable API <span class="ext" aria-hidden="true">↗</span></a
+                  >
+                  <a
+                    class="panel-link"
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >API credentials <span class="ext" aria-hidden="true">↗</span></a
+                  >
+                </div>
+              </div>
               <label class="field">
                 <span class="field-label">API key</span>
                 <input type="password" id="googleApiKey" name="googleApiKey" autocomplete="off" />
@@ -57,7 +118,25 @@
             </section>
 
             <section class="panel" aria-labelledby="h-azure">
-              <h2 id="h-azure">Azure Cognitive Services (Translator)</h2>
+              <div class="panel-head">
+                <h2 id="h-azure">Azure Cognitive Services (Translator)</h2>
+                <div class="panel-links">
+                  <a
+                    class="panel-link"
+                    href="https://portal.azure.com/#create/Microsoft.CognitiveServicesTextTranslation"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Create resource <span class="ext" aria-hidden="true">↗</span></a
+                  >
+                  <a
+                    class="panel-link"
+                    href="https://learn.microsoft.com/en-us/azure/ai-services/translator/how-to-create-translator"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Keys &amp; region (docs) <span class="ext" aria-hidden="true">↗</span></a
+                  >
+                </div>
+              </div>
               <label class="field">
                 <span class="field-label">Key</span>
                 <input type="password" id="azureTranslatorKey" name="azureTranslatorKey" autocomplete="off" />
@@ -71,7 +150,16 @@
 
           <div class="stack">
             <section class="panel" aria-labelledby="h-libre">
-              <h2 id="h-libre">LibreTranslate (local or remote)</h2>
+              <div class="panel-head">
+                <h2 id="h-libre">LibreTranslate (local or remote)</h2>
+                <a
+                  class="panel-link"
+                  href="https://github.com/LibreTranslate/LibreTranslate#installation"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Self-host / docs <span class="ext" aria-hidden="true">↗</span></a
+                >
+              </div>
               <label class="field">
                 <span class="field-label">Base URL</span>
                 <input type="url" id="libreTranslateBaseUrl" name="libreTranslateBaseUrl" placeholder="http://localhost:5000" />
@@ -79,7 +167,16 @@
             </section>
 
             <section class="panel" aria-labelledby="h-custom">
-              <h2 id="h-custom">Custom endpoint</h2>
+              <div class="panel-head">
+                <h2 id="h-custom">Custom endpoint</h2>
+                <a
+                  class="panel-link"
+                  href="https://github.com/LibreTranslate/LibreTranslate/blob/main/README.md#api"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >LibreTranslate-style API <span class="ext" aria-hidden="true">↗</span></a
+                >
+              </div>
               <p class="hint">
                 POST JSON like LibreTranslate: <code>{ q, source, target, format }</code> → <code>{ translatedText }</code>.
               </p>
@@ -94,7 +191,9 @@
             </section>
 
             <section class="panel panel--pair" aria-labelledby="h-lang">
-              <h2 id="h-lang">Languages</h2>
+              <div class="panel-head">
+                <h2 id="h-lang">Languages</h2>
+              </div>
               <div class="pair">
                 <label class="field">
                   <span class="field-label">Source</span>
@@ -108,7 +207,9 @@
             </section>
 
             <section class="panel" aria-labelledby="h-layout">
-              <h2 id="h-layout">Layout</h2>
+              <div class="panel-head">
+                <h2 id="h-layout">Layout</h2>
+              </div>
               <label class="field">
                 <span class="field-label">Mode</span>
                 <select id="layoutMode" name="layoutMode">
