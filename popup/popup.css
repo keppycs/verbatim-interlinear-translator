@@ -104,6 +104,24 @@ body.vit-ui.vit-popup {
   transition: color var(--vit-duration) var(--vit-ease);
 }
 
+.popup-error {
+  margin: 14px 0 0;
+  padding: 11px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #ffc9c9;
+  background: rgba(180, 40, 40, 0.2);
+  border: 1px solid rgba(255, 120, 100, 0.35);
+  border-radius: var(--vit-radius);
+  transition:
+    opacity var(--vit-duration) var(--vit-ease),
+    max-height var(--vit-duration) var(--vit-ease);
+}
+
+.popup-error[hidden] {
+  display: none !important;
+}
+
 /* Toggle switch */
 .switch {
   position: relative;

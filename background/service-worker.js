@@ -1,4 +1,4 @@
-import { translateWithSettings } from "../lib/translation/resolve.js";
+import { translateWithSettings, hasConfiguredTranslationBackend } from "../lib/translation/resolve.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
 
 function mergeSettings(stored) {
@@ -47,6 +47,13 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "TRANSLATION_BACKEND_READY") {
+    chrome.storage.sync.get(null, (stored) => {
+      const settings = mergeSettings(stored);
+      sendResponse({ ok: hasConfiguredTranslationBackend(settings) });
+    });
+    return true;
+  }
   if (msg?.type !== "TRANSLATE") return undefined;
   chrome.storage.sync.get(null, async (stored) => {
     const settings = mergeSettings(stored);

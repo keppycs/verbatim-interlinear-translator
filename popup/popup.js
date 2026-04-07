@@ -1,5 +1,25 @@
 const subEl = document.getElementById("toggleSub");
 const toggleEl = document.getElementById("pageToggle");
+const errorEl = document.getElementById("popupError");
+
+function setPopupError(text) {
+  if (!errorEl) return;
+  if (!text) {
+    errorEl.textContent = "";
+    errorEl.hidden = true;
+    return;
+  }
+  errorEl.textContent = text;
+  errorEl.hidden = false;
+}
+
+function formatToggleError(res) {
+  if (res?.message) return res.message;
+  const e = res?.error;
+  if (e === "translation_mismatch") return "Translation could not be completed. Try again.";
+  if (typeof e === "string") return e;
+  return "Something went wrong.";
+}
 
 function setSubtext(enabled) {
   if (subEl) {
@@ -24,6 +44,7 @@ async function getActiveTab() {
 }
 
 async function syncToggleFromTab() {
+  setPopupError("");
   const tab = await getActiveTab();
   if (!tab?.id || isRestrictedUrl(tab.url || "")) {
     setSubtext(false);
@@ -51,22 +72,27 @@ document.getElementById("openOptions").addEventListener("click", (e) => {
 });
 
 toggleEl.addEventListener("change", async () => {
+  setPopupError("");
   const tab = await getActiveTab();
   if (!tab?.id || isRestrictedUrl(tab.url || "")) {
     toggleEl.checked = false;
+    setPopupError("This page does not allow extensions. Try a normal website.");
     return;
   }
   const wantOn = toggleEl.checked;
   chrome.tabs.sendMessage(tab.id, { type: "SET_PAGE_TRANSLATION", enabled: wantOn }, (res) => {
     if (chrome.runtime.lastError) {
       toggleEl.checked = !wantOn;
+      setPopupError(chrome.runtime.lastError.message);
       return;
     }
     if (res?.ok === false) {
       toggleEl.checked = false;
       setSubtext(false);
+      setPopupError(formatToggleError(res));
       return;
     }
+    setPopupError("");
     setSubtext(!!res?.enabled);
   });
 });

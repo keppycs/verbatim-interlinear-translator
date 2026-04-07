@@ -26,6 +26,9 @@ let pageTranslationEnabled = false;
 
 const TRANSLATE_CHUNK_WORDS = 80;
 
+const NO_BACKEND_MESSAGE =
+  "Add at least one translation API in Options — use “Options & API keys” in this menu.";
+
 function storageGet() {
   return new Promise((resolve) => {
     chrome.storage.sync.get(null, resolve);
@@ -40,6 +43,18 @@ function sendTranslate(texts) {
         return;
       }
       resolve(response);
+    });
+  });
+}
+
+function checkTranslationBackendConfigured() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "TRANSLATION_BACKEND_READY" }, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({ ok: false });
+        return;
+      }
+      resolve(response && typeof response.ok === "boolean" ? response : { ok: false });
     });
   });
 }
@@ -211,9 +226,27 @@ async function setPageTranslationEnabled(enabled) {
     if (pageTranslationEnabled) {
       return { ok: true, enabled: true, already: true };
     }
+    const backendReady = await checkTranslationBackendConfigured();
+    if (!backendReady.ok) {
+      return {
+        ok: false,
+        error: "no_backend",
+        message: NO_BACKEND_MESSAGE,
+        enabled: false,
+      };
+    }
     const r = await translateWholePage();
     if (!r.ok) {
-      return { ok: false, error: r.error, enabled: false };
+      let msg = typeof r.error === "string" ? r.error : String(r.error);
+      if (r.error === "translation_mismatch") {
+        msg = "Translation could not be applied. Try again.";
+      }
+      return {
+        ok: false,
+        error: r.error,
+        message: msg,
+        enabled: false,
+      };
     }
     pageTranslationEnabled = true;
     return { ok: true, enabled: true, wordCount: r.wordCount, empty: r.empty };
