@@ -1,4 +1,4 @@
-import { translateWithCache } from "../lib/translation/cache.js";
+import { translateWithCache, probeCacheOnly } from "../lib/translation/cache.js";
 import { hasConfiguredTranslationBackend } from "../lib/translation/resolve.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
 
@@ -47,7 +47,40 @@ chrome.commands.onCommand.addListener((command) => {
   });
 });
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "VIT_STATE_UPDATE" && sender.tab?.id != null) {
+    const id = sender.tab.id;
+    const s = msg.state ?? {};
+    const enabled = !!s.enabled;
+    const loading = !!s.loading;
+    const toggleOn = !!(s.toggleOn ?? (enabled || loading));
+    void chrome.storage.session.set({
+      [`vit_tab_${id}`]: { enabled, loading, toggleOn, updatedAt: Date.now() },
+    });
+    return;
+  }
+  if (msg?.type === "TRANSLATE_CACHE_PROBE") {
+    (async () => {
+      try {
+        const stored = await chrome.storage.sync.get(null);
+        const settings = mergeSettings(stored);
+        const sourceLang = msg.sourceLang ?? settings.sourceLang;
+        const targetLang = String(msg.targetLang ?? settings.targetLang ?? "").trim();
+        if (!targetLang) {
+          sendResponse({
+            error: "no_target_language",
+            message: "Choose a target language in the extension toolbar menu.",
+          });
+          return;
+        }
+        const { translations } = await probeCacheOnly(msg.texts || [], sourceLang, targetLang);
+        sendResponse({ translations });
+      } catch (e) {
+        sendResponse({ error: "probe_failed", message: e?.message || String(e) });
+      }
+    })();
+    return true;
+  }
   if (msg?.type === "TRANSLATION_BACKEND_READY") {
     (async () => {
       try {

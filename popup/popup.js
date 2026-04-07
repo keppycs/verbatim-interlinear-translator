@@ -130,6 +130,31 @@ function saveLanguagesPartial(patch) {
   chrome.storage.sync.set(patch, () => void chrome.runtime.lastError);
 }
 
+/** Last state pushed from the tab via the background (instant; avoids waiting on the busy content script). */
+async function applySessionSnapshotForTab(tabId) {
+  if (tabId == null) return;
+  try {
+    const key = `vit_tab_${tabId}`;
+    const obj = await chrome.storage.session.get(key);
+    const snap = obj[key];
+    if (!snap || typeof snap !== "object") return;
+    const loading = !!snap.loading;
+    const on = !!(snap.toggleOn ?? snap.enabled ?? loading);
+    if (loading) {
+      setLoading(true);
+    } else {
+      setLoading(false);
+      if (toggleEl) toggleEl.disabled = false;
+    }
+    if (toggleEl) toggleEl.checked = on;
+    if (subEl) {
+      subEl.textContent = loading ? "Translating…" : on ? "On — whole page" : "Off";
+    }
+  } catch {
+    /* session storage may be unavailable in some environments */
+  }
+}
+
 function syncToggleFromTab() {
   return new Promise((resolve) => {
     void (async () => {
@@ -142,14 +167,9 @@ function syncToggleFromTab() {
         resolve();
         return;
       }
+      await applySessionSnapshotForTab(tab.id);
       chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
         if (chrome.runtime.lastError) {
-          setLoading(false);
-          setSubtext(false);
-          if (toggleEl) {
-            toggleEl.checked = false;
-            toggleEl.disabled = false;
-          }
           resolve();
           return;
         }
@@ -163,11 +183,7 @@ function syncToggleFromTab() {
         }
         if (toggleEl) toggleEl.checked = on;
         if (subEl) {
-          if (loading) {
-            subEl.textContent = "Translating…";
-          } else {
-            subEl.textContent = on ? "On — whole page" : "Off";
-          }
+          subEl.textContent = loading ? "Translating…" : on ? "On — whole page" : "Off";
         }
         resolve();
       });

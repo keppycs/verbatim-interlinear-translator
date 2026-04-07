@@ -35,6 +35,12 @@
   word-break: break-word;
 }
 
+[data-vit-root] .vit-gloss.vit-gloss-pending {
+  opacity: 0.45;
+  font-style: italic;
+  letter-spacing: 0.06em;
+}
+
 [data-vit-root][data-vit-layout="absolute"] .vit-word {
   position: relative;
   display: inline;

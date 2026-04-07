@@ -82,7 +82,7 @@ function yieldToMain() {
 
 /**
  * @param {string[]} words
- * @param {string[]} glosses
+ * @param {(string|null)[]} glosses - null = pending (shows … until filled)
  * @param {string} originalText
  * @param {"inject"|"absolute"} layoutMode
  */
@@ -100,12 +100,78 @@ function buildInterlinearFragment(words, glosses, originalText, layoutMode) {
     src.textContent = words[i];
     const gloss = document.createElement("span");
     gloss.className = "vit-gloss";
-    gloss.textContent = glosses[i] ?? "";
+    const g = glosses[i];
+    if (g === null) {
+      gloss.textContent = "…";
+      gloss.classList.add("vit-gloss-pending");
+    } else {
+      gloss.textContent = g ?? "";
+    }
     word.appendChild(src);
     word.appendChild(gloss);
     root.appendChild(word);
   }
   return root;
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {string[]} glosses
+ */
+function updateGlossesInRoot(root, glosses) {
+  const glossEls = root.querySelectorAll(".vit-gloss");
+  for (let i = 0; i < glosses.length; i++) {
+    const el = glossEls[i];
+    if (el) {
+      el.textContent = glosses[i] ?? "";
+      el.classList.remove("vit-gloss-pending");
+    }
+  }
+}
+
+function broadcastVitState() {
+  chrome.runtime
+    .sendMessage({
+      type: "VIT_STATE_UPDATE",
+      state: {
+        enabled: pageTranslationEnabled,
+        loading: translationInProgress,
+        toggleOn: pageTranslationEnabled || translationInProgress,
+      },
+    })
+    .catch(() => {});
+}
+
+function sendCacheProbe(texts, sourceLang, targetLang) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "TRANSLATE_CACHE_PROBE", texts, sourceLang, targetLang }, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({ error: chrome.runtime.lastError.message });
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+/**
+ * @param {string[]} words
+ * @param {string} sourceLang
+ * @param {string} targetLang
+ */
+async function sendTranslateWordsInChunks(words, sourceLang, targetLang) {
+  const allTranslations = [];
+  for (let i = 0; i < words.length; i += TRANSLATE_CHUNK_WORDS) {
+    const chunk = words.slice(i, i + TRANSLATE_CHUNK_WORDS);
+    const result = await sendTranslate(chunk, sourceLang, targetLang);
+    if (result?.error) return { error: result.error, message: result.message };
+    if (!result?.translations || result.translations.length !== chunk.length) {
+      return { error: "translation_mismatch" };
+    }
+    allTranslations.push(...result.translations);
+    await yieldToMain();
+  }
+  return { translations: allTranslations };
 }
 
 /**
@@ -157,27 +223,6 @@ function buildSegments(textNodes) {
   return segments;
 }
 
-/**
- * @param {string[]} flatWords
- * @param {string} sourceLang
- * @param {string} targetLang
- */
-async function translateAllWords(flatWords, sourceLang, targetLang) {
-  /** @type {string[]} */
-  const allTranslations = [];
-  for (let i = 0; i < flatWords.length; i += TRANSLATE_CHUNK_WORDS) {
-    const chunk = flatWords.slice(i, i + TRANSLATE_CHUNK_WORDS);
-    const result = await sendTranslate(chunk, sourceLang, targetLang);
-    if (result?.error) return { error: result.error, message: result.message };
-    if (!result?.translations || result.translations.length !== chunk.length) {
-      return { error: "translation_mismatch" };
-    }
-    allTranslations.push(...result.translations);
-    await yieldToMain();
-  }
-  return { translations: allTranslations };
-}
-
 function stopObserveNewContent() {
   if (mutateDebounceTimer) {
     clearTimeout(mutateDebounceTimer);
@@ -212,9 +257,7 @@ function startObserveNewContent() {
 
 /**
  * Walk the DOM for plain text not yet wrapped in interlinear spans, translate, and replace.
- * Safe to call again when infinite scroll or SPA injects new nodes.
- */
-/**
+ * Per-segment: cache probe shows cached glosses immediately; API runs only for misses (then fills in).
  * @param {{ activatingFirst?: boolean }} [options] - First enable: set pageTranslationEnabled before clearing loading so the popup never sees a stale "off" gap.
  */
 function translateWholePage(options = {}) {
@@ -226,6 +269,7 @@ function translateWholePage(options = {}) {
 
   translateWholePagePromise = (async () => {
     translationInProgress = true;
+    broadcastVitState();
     stopObserveNewContent();
     try {
       const stored = await storageGet();
@@ -249,46 +293,120 @@ function translateWholePage(options = {}) {
         return { ok: true, wordCount: 0, empty: true };
       }
 
-      /** @type {{ node: Text, words: string[], originalText: string, start: number, end: number }[]} */
-      const indexed = [];
-      let offset = 0;
+      let totalWords = 0;
+
       for (const seg of segments) {
-        const start = offset;
-        const end = offset + seg.words.length;
-        indexed.push({ ...seg, start, end });
-        offset = end;
-      }
-
-      const flatWords = segments.flatMap((s) => s.words);
-      const tr = await translateAllWords(flatWords, sourceLang, targetLang);
-      if (tr.error) {
-        return { ok: false, error: tr.error, message: tr.message };
-      }
-
-      const translations = tr.translations;
-
-      for (const seg of indexed) {
-        const slice = translations.slice(seg.start, seg.end);
-        if (slice.length !== seg.words.length) {
-          return { ok: false, error: "translation_mismatch" };
-        }
+        const words = seg.words;
+        totalWords += words.length;
         const parent = seg.node.parentNode;
         if (!parent || !seg.node.isConnected) continue;
+
+        let probe = await sendCacheProbe(words, sourceLang, targetLang);
+        if (probe.error) {
+          const tr = await sendTranslateWordsInChunks(words, sourceLang, targetLang);
+          if (tr.error) {
+            return { ok: false, error: tr.error, message: tr.message };
+          }
+          try {
+            const frag = buildInterlinearFragment(words, tr.translations, seg.originalText, layoutMode);
+            parent.replaceChild(frag, seg.node);
+          } catch (e) {
+            console.warn("[Verbatim]", e);
+          }
+          await yieldToMain();
+          continue;
+        }
+
+        const probes = probe.translations;
+        if (!Array.isArray(probes) || probes.length !== words.length) {
+          return { ok: false, error: "translation_mismatch" };
+        }
+
+        /** @type {number[]} */
+        const missingIdx = [];
+        for (let i = 0; i < probes.length; i++) {
+          if (probes[i] == null) missingIdx.push(i);
+        }
+
+        if (missingIdx.length === 0) {
+          /** @type {string[]} */
+          const glosses = probes.map((g) => (g == null ? "" : String(g)));
+          try {
+            const frag = buildInterlinearFragment(words, glosses, seg.originalText, layoutMode);
+            parent.replaceChild(frag, seg.node);
+          } catch (e) {
+            console.warn("[Verbatim]", e);
+          }
+          await yieldToMain();
+          continue;
+        }
+
+        if (missingIdx.length === words.length) {
+          const tr = await sendTranslateWordsInChunks(words, sourceLang, targetLang);
+          if (tr.error) {
+            return { ok: false, error: tr.error, message: tr.message };
+          }
+          try {
+            const frag = buildInterlinearFragment(words, tr.translations, seg.originalText, layoutMode);
+            parent.replaceChild(frag, seg.node);
+          } catch (e) {
+            console.warn("[Verbatim]", e);
+          }
+          await yieldToMain();
+          continue;
+        }
+
+        /** @type {(string|null)[]} */
+        const partialGlosses = probes.map((g) => (g == null ? null : g));
+        /** @type {HTMLSpanElement | null} */
+        let rootRef = null;
         try {
-          const frag = buildInterlinearFragment(seg.words, slice, seg.originalText, layoutMode);
+          const frag = buildInterlinearFragment(words, partialGlosses, seg.originalText, layoutMode);
           parent.replaceChild(frag, seg.node);
+          rootRef = frag;
         } catch (e) {
           console.warn("[Verbatim]", e);
+          continue;
         }
+
+        const missing = missingIdx.map((i) => words[i]);
+        /** @type {string[]} */
+        const apiFlat = [];
+        for (let i = 0; i < missing.length; i += TRANSLATE_CHUNK_WORDS) {
+          const chunk = missing.slice(i, i + TRANSLATE_CHUNK_WORDS);
+          const tr = await sendTranslate(chunk, sourceLang, targetLang);
+          if (tr.error) {
+            return { ok: false, error: tr.error, message: tr.message };
+          }
+          if (!tr.translations || tr.translations.length !== chunk.length) {
+            return { ok: false, error: "translation_mismatch" };
+          }
+          apiFlat.push(...tr.translations);
+          await yieldToMain();
+        }
+
+        const fullGlosses = words.map((_, i) => {
+          const g = probes[i];
+          return g != null ? String(g) : "";
+        });
+        for (let j = 0; j < missingIdx.length; j++) {
+          fullGlosses[missingIdx[j]] = apiFlat[j];
+        }
+
+        if (rootRef) {
+          updateGlossesInRoot(rootRef, fullGlosses);
+        }
+        await yieldToMain();
       }
 
       if (activatingFirst) {
         pageTranslationEnabled = true;
       }
-      return { ok: true, wordCount: flatWords.length };
+      return { ok: true, wordCount: totalWords };
     } finally {
       translationInProgress = false;
       translateWholePagePromise = null;
+      broadcastVitState();
       if (pageTranslationEnabled) {
         startObserveNewContent();
       }
@@ -347,6 +465,7 @@ async function setPageTranslationEnabled(enabled) {
   try {
     if (enabled) {
       if (pageTranslationEnabled) {
+        broadcastVitState();
         return { ok: true, enabled: true, already: true };
       }
       const backendReady = await checkTranslationBackendConfigured();
@@ -379,6 +498,7 @@ async function setPageTranslationEnabled(enabled) {
     }
     restorePage();
     pageTranslationEnabled = false;
+    broadcastVitState();
     return { ok: true, enabled: false };
   } catch (e) {
     return {
