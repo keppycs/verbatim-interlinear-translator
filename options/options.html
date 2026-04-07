@@ -7,102 +7,127 @@
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
-    <main class="wrap">
-      <header>
-        <h1>Verbatim Interlinear Translator</h1>
-        <p class="tagline">API keys, languages, and layout — use the toolbar toggle for whole-page translation.</p>
+    <div class="app">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="app-title-block">
+            <p class="eyebrow">Extension settings</p>
+            <h1>Verbatim Interlinear Translator</h1>
+            <p class="tagline">
+              Connect translation providers, set languages, and choose how glosses sit on the page. Use the toolbar switch to translate the
+              whole tab.
+            </p>
+          </div>
+        </div>
       </header>
 
-      <section>
-        <h2>Translation backend</h2>
-        <p class="hint">
-          <strong>Auto</strong> tries providers in order: DeepL → Google Cloud Translation → Azure → LibreTranslate (URL) → Custom (URL) → on-device (when available).
-        </p>
-        <label>
-          Backend
-          <select id="translationBackend" name="translationBackend"></select>
-        </label>
-      </section>
+      <div class="app-main">
+        <div class="app-grid">
+          <div class="stack">
+            <section class="panel" aria-labelledby="h-backend">
+              <h2 id="h-backend">Translation backend</h2>
+              <p class="hint">
+                <strong>Auto</strong> tries providers in order: DeepL → Google Cloud Translation → Azure → LibreTranslate (URL) → Custom
+                (URL) → on-device (when available).
+              </p>
+              <label class="field">
+                <span class="field-label">Backend</span>
+                <select id="translationBackend" name="translationBackend"></select>
+              </label>
+            </section>
 
-      <section>
-        <h2>DeepL API</h2>
-        <label>
-          Auth key
-          <input type="password" id="deeplAuthKey" name="deeplAuthKey" autocomplete="off" />
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" id="deeplUseProApi" name="deeplUseProApi" />
-          Use Pro endpoint (api.deepl.com)
-        </label>
-      </section>
+            <section class="panel" aria-labelledby="h-deepl">
+              <h2 id="h-deepl">DeepL API</h2>
+              <label class="field">
+                <span class="field-label">Auth key</span>
+                <input type="password" id="deeplAuthKey" name="deeplAuthKey" autocomplete="off" />
+              </label>
+              <label class="field field--inline">
+                <input type="checkbox" id="deeplUseProApi" name="deeplUseProApi" />
+                <span>Use Pro endpoint (api.deepl.com)</span>
+              </label>
+            </section>
 
-      <section>
-        <h2>Google Cloud Translation</h2>
-        <label>
-          API key
-          <input type="password" id="googleApiKey" name="googleApiKey" autocomplete="off" />
-        </label>
-      </section>
+            <section class="panel" aria-labelledby="h-google">
+              <h2 id="h-google">Google Cloud Translation</h2>
+              <label class="field">
+                <span class="field-label">API key</span>
+                <input type="password" id="googleApiKey" name="googleApiKey" autocomplete="off" />
+              </label>
+            </section>
 
-      <section>
-        <h2>Azure Cognitive Services (Translator)</h2>
-        <label>
-          Key
-          <input type="password" id="azureTranslatorKey" name="azureTranslatorKey" autocomplete="off" />
-        </label>
-        <label>
-          Region (if required by your resource)
-          <input type="text" id="azureTranslatorRegion" name="azureTranslatorRegion" placeholder="e.g. eastus" />
-        </label>
-      </section>
+            <section class="panel" aria-labelledby="h-azure">
+              <h2 id="h-azure">Azure Cognitive Services (Translator)</h2>
+              <label class="field">
+                <span class="field-label">Key</span>
+                <input type="password" id="azureTranslatorKey" name="azureTranslatorKey" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span class="field-label">Region (if required)</span>
+                <input type="text" id="azureTranslatorRegion" name="azureTranslatorRegion" placeholder="e.g. eastus" />
+              </label>
+            </section>
+          </div>
 
-      <section>
-        <h2>LibreTranslate (local or remote)</h2>
-        <label>
-          Base URL
-          <input type="url" id="libreTranslateBaseUrl" name="libreTranslateBaseUrl" placeholder="http://localhost:5000" />
-        </label>
-      </section>
+          <div class="stack">
+            <section class="panel" aria-labelledby="h-libre">
+              <h2 id="h-libre">LibreTranslate (local or remote)</h2>
+              <label class="field">
+                <span class="field-label">Base URL</span>
+                <input type="url" id="libreTranslateBaseUrl" name="libreTranslateBaseUrl" placeholder="http://localhost:5000" />
+              </label>
+            </section>
 
-      <section>
-        <h2>Custom endpoint</h2>
-        <p class="hint">POST JSON like LibreTranslate: <code>{ q, source, target, format }</code> → <code>{ translatedText }</code>.</p>
-        <label>
-          Base URL
-          <input type="url" id="customTranslateBaseUrl" name="customTranslateBaseUrl" />
-        </label>
-        <label>
-          Path
-          <input type="text" id="customTranslatePath" name="customTranslatePath" value="/translate" />
-        </label>
-      </section>
+            <section class="panel" aria-labelledby="h-custom">
+              <h2 id="h-custom">Custom endpoint</h2>
+              <p class="hint">
+                POST JSON like LibreTranslate: <code>{ q, source, target, format }</code> → <code>{ translatedText }</code>.
+              </p>
+              <label class="field">
+                <span class="field-label">Base URL</span>
+                <input type="url" id="customTranslateBaseUrl" name="customTranslateBaseUrl" />
+              </label>
+              <label class="field">
+                <span class="field-label">Path</span>
+                <input type="text" id="customTranslatePath" name="customTranslatePath" value="/translate" />
+              </label>
+            </section>
 
-      <section>
-        <h2>Languages</h2>
-        <label>
-          Source
-          <input type="text" id="sourceLang" name="sourceLang" placeholder="auto" />
-        </label>
-        <label>
-          Target
-          <input type="text" id="targetLang" name="targetLang" placeholder="en" />
-        </label>
-      </section>
+            <section class="panel panel--pair" aria-labelledby="h-lang">
+              <h2 id="h-lang">Languages</h2>
+              <div class="pair">
+                <label class="field">
+                  <span class="field-label">Source</span>
+                  <input type="text" id="sourceLang" name="sourceLang" placeholder="auto" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Target</span>
+                  <input type="text" id="targetLang" name="targetLang" placeholder="en" />
+                </label>
+              </div>
+            </section>
 
-      <section>
-        <h2>Layout</h2>
-        <label>
-          Mode
-          <select id="layoutMode" name="layoutMode">
-            <option value="inject">Inject HTML (in-flow)</option>
-            <option value="absolute">Absolute positioning (no layout shift)</option>
-          </select>
-        </label>
-      </section>
+            <section class="panel" aria-labelledby="h-layout">
+              <h2 id="h-layout">Layout</h2>
+              <label class="field">
+                <span class="field-label">Mode</span>
+                <select id="layoutMode" name="layoutMode">
+                  <option value="inject">Inject HTML (in-flow)</option>
+                  <option value="absolute">Absolute positioning (no layout shift)</option>
+                </select>
+              </label>
+            </section>
+          </div>
+        </div>
+      </div>
 
-      <p id="status" class="status" role="status"></p>
-      <button type="button" id="save">Save</button>
-    </main>
+      <footer class="app-footer">
+        <div class="app-footer-inner">
+          <p id="status" class="status" role="status"></p>
+          <button type="button" id="save">Save settings</button>
+        </div>
+      </footer>
+    </div>
     <script type="module" src="options.js"></script>
   </body>
 </html>
