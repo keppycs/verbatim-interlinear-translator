@@ -6,16 +6,18 @@ function mergeSettings(stored) {
 }
 
 function ensureContextMenu() {
-  chrome.contextMenus.create(
-    {
-      id: "vit-translate-selection",
-      title: "Verbatim interlinear translate",
-      contexts: ["selection"],
-    },
-    () => {
-      void chrome.runtime.lastError;
-    }
-  );
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create(
+      {
+        id: "vit-toggle-page",
+        title: "Toggle Verbatim interlinear (whole page)",
+        contexts: ["page"],
+      },
+      () => {
+        void chrome.runtime.lastError;
+      }
+    );
+  });
 }
 
 ensureContextMenu();
@@ -32,15 +34,15 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== "vit-translate-selection" || tab?.id == null) return;
-  chrome.tabs.sendMessage(tab.id, { type: "APPLY_INTERLINEAR" });
+  if (info.menuItemId !== "vit-toggle-page" || tab?.id == null) return;
+  chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PAGE_TRANSLATION" });
 });
 
 chrome.commands.onCommand.addListener((command) => {
-  if (command !== "translate-selection") return;
+  if (command !== "toggle-page-translation") return;
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const id = tabs[0]?.id;
-    if (id != null) chrome.tabs.sendMessage(id, { type: "APPLY_INTERLINEAR" });
+    if (id != null) chrome.tabs.sendMessage(id, { type: "TOGGLE_PAGE_TRANSLATION" });
   });
 });
 

@@ -57,7 +57,7 @@ function applyToForm(settings) {
 function setStatus(text, ok) {
   const el = document.getElementById("status");
   el.textContent = text;
-  el.style.color = ok ? "#060" : "#a00";
+  el.classList.toggle("err", ok === false);
 }
 
 fillBackendSelect();

@@ -1,6 +1,44 @@
-function setPopupStatus(text) {
-  const el = document.getElementById("popupStatus");
-  if (el) el.textContent = text || "";
+const subEl = document.getElementById("toggleSub");
+const toggleEl = document.getElementById("pageToggle");
+
+function setSubtext(enabled) {
+  if (subEl) {
+    subEl.textContent = enabled ? "On — whole page" : "Off";
+  }
+  if (toggleEl) toggleEl.checked = !!enabled;
+}
+
+function isRestrictedUrl(url) {
+  if (!url) return true;
+  return (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("edge://") ||
+    url.startsWith("about:")
+  );
+}
+
+async function getActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab;
+}
+
+async function syncToggleFromTab() {
+  const tab = await getActiveTab();
+  if (!tab?.id || isRestrictedUrl(tab.url || "")) {
+    setSubtext(false);
+    if (toggleEl) toggleEl.disabled = true;
+    return;
+  }
+  if (toggleEl) toggleEl.disabled = false;
+  chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
+    if (chrome.runtime.lastError) {
+      setSubtext(false);
+      if (toggleEl) toggleEl.checked = false;
+      return;
+    }
+    setSubtext(!!res?.enabled);
+  });
 }
 
 document.getElementById("openOptions").addEventListener("click", (e) => {
@@ -12,25 +50,29 @@ document.getElementById("openOptions").addEventListener("click", (e) => {
   }
 });
 
-document.getElementById("translateSelection").addEventListener("click", async () => {
-  setPopupStatus("");
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    setPopupStatus("No active tab.");
+toggleEl.addEventListener("change", async () => {
+  const tab = await getActiveTab();
+  if (!tab?.id || isRestrictedUrl(tab.url || "")) {
+    toggleEl.checked = false;
     return;
   }
-  const url = tab.url || "";
-  if (url.startsWith("chrome://") || url.startsWith("chrome-extension://") || url.startsWith("edge://")) {
-    setPopupStatus("This page does not allow extensions. Try a normal web page.");
-    return;
-  }
-  chrome.tabs.sendMessage(tab.id, { type: "APPLY_INTERLINEAR" }, (response) => {
+  const wantOn = toggleEl.checked;
+  chrome.tabs.sendMessage(tab.id, { type: "SET_PAGE_TRANSLATION", enabled: wantOn }, (res) => {
     if (chrome.runtime.lastError) {
-      setPopupStatus(chrome.runtime.lastError.message);
+      toggleEl.checked = !wantOn;
       return;
     }
-    if (response?.error) {
-      setPopupStatus(String(response.error));
+    if (res?.ok === false) {
+      toggleEl.checked = false;
+      setSubtext(false);
+      return;
     }
+    setSubtext(!!res?.enabled);
   });
 });
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") syncToggleFromTab();
+});
+
+syncToggleFromTab();

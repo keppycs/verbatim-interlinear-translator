@@ -21,6 +21,11 @@ function shouldSkipForSegmenter(text) {
   return /[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]/.test(t);
 }
 
+/** @type {boolean} */
+let pageTranslationEnabled = false;
+
+const TRANSLATE_CHUNK_WORDS = 80;
+
 function storageGet() {
   return new Promise((resolve) => {
     chrome.storage.sync.get(null, resolve);
@@ -39,38 +44,26 @@ function sendTranslate(texts) {
   });
 }
 
-function showVitToast(message, isError) {
-  const el = document.createElement("div");
-  el.setAttribute("data-vit-toast", "1");
-  el.textContent = message;
-  el.style.cssText = [
-    "position:fixed",
-    "top:12px",
-    "left:50%",
-    "transform:translateX(-50%)",
-    "z-index:2147483647",
-    "max-width:min(90vw,28rem)",
-    "padding:8px 12px",
-    "border-radius:6px",
-    "font:14px system-ui,Segoe UI,sans-serif",
-    "box-shadow:0 2px 10px rgba(0,0,0,.25)",
-    isError ? "background:#3d1515;color:#ffecec" : "background:#152a15;color:#ecffec",
-  ].join(";");
-  const root = document.body || document.documentElement;
-  root.appendChild(el);
-  window.setTimeout(() => {
-    el.remove();
-  }, 4500);
+function yieldToMain() {
+  return new Promise((resolve) => {
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(() => resolve(), { timeout: 250 });
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
 }
 
 /**
  * @param {string[]} words
  * @param {string[]} glosses
+ * @param {string} originalText
  * @param {"inject"|"absolute"} layoutMode
  */
-function buildInterlinearFragment(words, glosses, layoutMode) {
+function buildInterlinearFragment(words, glosses, originalText, layoutMode) {
   const root = document.createElement("span");
   root.setAttribute("data-vit-root", "1");
+  root.setAttribute("data-vit-original-text", originalText);
   root.setAttribute("data-vit-layout", layoutMode === "absolute" ? "absolute" : "inject");
   root.className = "vit-root";
   for (let i = 0; i < words.length; i++) {
@@ -89,64 +82,149 @@ function buildInterlinearFragment(words, glosses, layoutMode) {
   return root;
 }
 
-async function applyInterlinearToSelection() {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-    showVitToast("Select some text first.", true);
-    return { ok: false, error: "no_selection" };
+/**
+ * Collect visible text nodes suitable for word splitting.
+ * @returns {Text[]}
+ */
+function collectTextNodes() {
+  const root = document.body;
+  if (!root) return [];
+  const out = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(/** @type {Node} */ node) {
+      const t = /** @type {Text} */ (node);
+      const p = t.parentElement;
+      if (!p) return NodeFilter.FILTER_REJECT;
+      const tag = p.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEXTAREA" || tag === "OPTION") {
+        return NodeFilter.FILTER_REJECT;
+      }
+      if (p.closest("[data-vit-root]")) return NodeFilter.FILTER_REJECT;
+      if (p.closest("svg")) return NodeFilter.FILTER_REJECT;
+      if (p.isContentEditable) return NodeFilter.FILTER_REJECT;
+      const text = t.nodeValue;
+      if (!text || !text.trim()) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  let n = walker.nextNode();
+  while (n) {
+    out.push(/** @type {Text} */ (n));
+    n = walker.nextNode();
+  }
+  return out;
+}
+
+/**
+ * @param {Text[]} textNodes
+ */
+function buildSegments(textNodes) {
+  /** @type {{ node: Text, words: string[], originalText: string }[]} */
+  const segments = [];
+  for (const node of textNodes) {
+    const originalText = node.nodeValue || "";
+    if (shouldSkipForSegmenter(originalText)) continue;
+    const words = splitWordsWhitespaceOnly(originalText);
+    if (!words.length) continue;
+    segments.push({ node, words, originalText });
+  }
+  return segments;
+}
+
+/**
+ * @param {string[]} flatWords
+ */
+async function translateAllWords(flatWords) {
+  /** @type {string[]} */
+  const allTranslations = [];
+  for (let i = 0; i < flatWords.length; i += TRANSLATE_CHUNK_WORDS) {
+    const chunk = flatWords.slice(i, i + TRANSLATE_CHUNK_WORDS);
+    const result = await sendTranslate(chunk);
+    if (result?.error) return { error: result.error };
+    if (!result?.translations || result.translations.length !== chunk.length) {
+      return { error: "translation_mismatch" };
+    }
+    allTranslations.push(...result.translations);
+    await yieldToMain();
+  }
+  return { translations: allTranslations };
+}
+
+async function translateWholePage() {
+  const textNodes = collectTextNodes();
+  const segments = buildSegments(textNodes);
+  if (!segments.length) {
+    return { ok: true, wordCount: 0, empty: true };
   }
 
-  const text = sel.toString();
-  if (!text.trim()) {
-    showVitToast("Nothing to translate.", true);
-    return { ok: false, error: "empty" };
+  /** @type {{ node: Text, words: string[], originalText: string, start: number, end: number }[]} */
+  const indexed = [];
+  let offset = 0;
+  for (const seg of segments) {
+    const start = offset;
+    const end = offset + seg.words.length;
+    indexed.push({ ...seg, start, end });
+    offset = end;
   }
 
-  if (shouldSkipForSegmenter(text)) {
-    showVitToast("This selection needs a segmenter (not supported yet).", true);
-    return { ok: false, error: "needs_segmenter" };
+  const flatWords = segments.flatMap((s) => s.words);
+  const tr = await translateAllWords(flatWords);
+  if (tr.error) {
+    return { ok: false, error: tr.error };
   }
 
-  const words = splitWordsWhitespaceOnly(text);
-  if (!words.length) {
-    showVitToast("Nothing to translate.", true);
-    return { ok: false, error: "empty" };
-  }
-
-  const range = sel.getRangeAt(0).cloneRange();
+  const translations = tr.translations;
   const stored = await storageGet();
   const layoutMode = stored.layoutMode === "absolute" ? "absolute" : "inject";
 
-  const result = await sendTranslate(words);
-  if (result?.error) {
-    showVitToast(String(result.error), true);
-    return { ok: false, error: result.error };
-  }
-  if (!result?.translations || result.translations.length !== words.length) {
-    showVitToast("Translation failed.", true);
-    return { ok: false, error: "translation_mismatch" };
-  }
-
-  if (!range.commonAncestorContainer.isConnected) {
-    showVitToast("The page changed while translating. Try again.", true);
-    return { ok: false, error: "stale_range" };
-  }
-
-  try {
-    range.deleteContents();
-    const frag = buildInterlinearFragment(words, result.translations, layoutMode);
-    range.insertNode(frag);
-    sel.removeAllRanges();
-  } catch (e) {
-    showVitToast(
-      "Could not insert translation here (complex selection). Try a smaller selection.",
-      true
-    );
-    return { ok: false, error: String(e?.message || e) };
+  for (const seg of indexed) {
+    const slice = translations.slice(seg.start, seg.end);
+    if (slice.length !== seg.words.length) {
+      return { ok: false, error: "translation_mismatch" };
+    }
+    const parent = seg.node.parentNode;
+    if (!parent || !seg.node.isConnected) continue;
+    try {
+      const frag = buildInterlinearFragment(seg.words, slice, seg.originalText, layoutMode);
+      parent.replaceChild(frag, seg.node);
+    } catch (e) {
+      console.warn("[Verbatim]", e);
+    }
   }
 
-  showVitToast(`Interlinear translation added (${result.backend || "ok"}).`, false);
-  return { ok: true, backend: result.backend, wordCount: words.length };
+  return { ok: true, wordCount: flatWords.length };
+}
+
+function restorePage() {
+  const roots = Array.from(document.querySelectorAll("[data-vit-root]"));
+  for (const el of roots) {
+    const orig = el.getAttribute("data-vit-original-text");
+    if (orig == null) continue;
+    const parent = el.parentNode;
+    if (!parent) continue;
+    parent.replaceChild(document.createTextNode(orig), el);
+  }
+}
+
+async function setPageTranslationEnabled(enabled) {
+  if (enabled) {
+    if (pageTranslationEnabled) {
+      return { ok: true, enabled: true, already: true };
+    }
+    const r = await translateWholePage();
+    if (!r.ok) {
+      return { ok: false, error: r.error, enabled: false };
+    }
+    pageTranslationEnabled = true;
+    return { ok: true, enabled: true, wordCount: r.wordCount, empty: r.empty };
+  }
+  restorePage();
+  pageTranslationEnabled = false;
+  return { ok: true, enabled: false };
+}
+
+async function togglePageTranslation() {
+  return setPageTranslationEnabled(!pageTranslationEnabled);
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -159,8 +237,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendResponse({ words: splitWordsWhitespaceOnly(t), skipped: null });
     return true;
   }
-  if (msg?.type === "APPLY_INTERLINEAR") {
-    applyInterlinearToSelection().then(sendResponse);
+  if (msg?.type === "GET_PAGE_TRANSLATION_STATE") {
+    sendResponse({ enabled: pageTranslationEnabled });
+    return true;
+  }
+  if (msg?.type === "SET_PAGE_TRANSLATION") {
+    setPageTranslationEnabled(!!msg.enabled).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "TOGGLE_PAGE_TRANSLATION") {
+    togglePageTranslation().then(sendResponse);
     return true;
   }
   return undefined;
