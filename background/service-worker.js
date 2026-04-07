@@ -5,6 +5,21 @@ function mergeSettings(stored) {
   return { ...defaultSettings, ...stored };
 }
 
+function ensureContextMenu() {
+  chrome.contextMenus.create(
+    {
+      id: "vit-translate-selection",
+      title: "Verbatim interlinear translate",
+      contexts: ["selection"],
+    },
+    () => {
+      void chrome.runtime.lastError;
+    }
+  );
+}
+
+ensureContextMenu();
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get(null, (stored) => {
     const patch = {};
@@ -12,6 +27,20 @@ chrome.runtime.onInstalled.addListener(() => {
       if (stored[key] === undefined) patch[key] = defaultSettings[key];
     }
     if (Object.keys(patch).length) chrome.storage.sync.set(patch);
+  });
+  ensureContextMenu();
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== "vit-translate-selection" || tab?.id == null) return;
+  chrome.tabs.sendMessage(tab.id, { type: "APPLY_INTERLINEAR" });
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== "translate-selection") return;
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const id = tabs[0]?.id;
+    if (id != null) chrome.tabs.sendMessage(id, { type: "APPLY_INTERLINEAR" });
   });
 });
 

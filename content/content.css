@@ -1,0 +1,68 @@
+/* Scoped under [data-vit-root] to reduce collisions with host pages */
+[data-vit-root] {
+  display: inline;
+  white-space: normal;
+}
+
+[data-vit-root] .vit-word {
+  box-sizing: border-box;
+}
+
+[data-vit-root][data-vit-layout="inject"] .vit-word {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: baseline;
+  margin-right: 0.35em;
+  line-height: 1.25;
+}
+
+[data-vit-root][data-vit-layout="inject"] .vit-word:last-child {
+  margin-right: 0;
+}
+
+[data-vit-root][data-vit-layout="inject"] .vit-source {
+  display: inline-block;
+}
+
+[data-vit-root][data-vit-layout="inject"] .vit-gloss {
+  display: block;
+  font-size: 0.72em;
+  line-height: 1.15;
+  opacity: 0.92;
+  max-width: 12em;
+  text-align: center;
+  word-break: break-word;
+}
+
+[data-vit-root][data-vit-layout="absolute"] .vit-word {
+  position: relative;
+  display: inline;
+  margin-right: 0.35em;
+  vertical-align: baseline;
+}
+
+[data-vit-root][data-vit-layout="absolute"] .vit-word:last-child {
+  margin-right: 0;
+}
+
+[data-vit-root][data-vit-layout="absolute"] .vit-gloss {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: 1px;
+  font-size: 0.72em;
+  line-height: 1.15;
+  white-space: normal;
+  max-width: 14em;
+  text-align: center;
+  word-break: break-word;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+
+[data-vit-root] .vit-gloss.vit-gloss--pending {
+  opacity: 0.55;
+  font-style: italic;
+}

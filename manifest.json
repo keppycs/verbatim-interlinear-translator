@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Verbatim Interlinear Translator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Word-by-word interlinear translation injected into page HTML.",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "tabs", "contextMenus"],
   "host_permissions": ["https://api-free.deepl.com/*", "https://api.deepl.com/*", "https://translation.googleapis.com/*", "https://*.googleapis.com/*", "https://api.cognitive.microsofttranslator.com/*", "http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background/service-worker.js",
@@ -17,10 +17,20 @@
     "default_title": "Verbatim Interlinear Translator",
     "default_popup": "popup/popup.html"
   },
+  "commands": {
+    "translate-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Interlinear translate the current selection"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content/content.js"],
+      "css": ["content/content.css"],
       "run_at": "document_idle"
     }
   ]

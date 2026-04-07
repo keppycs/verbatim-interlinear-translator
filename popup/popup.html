@@ -8,7 +8,8 @@
         font-family: system-ui, sans-serif;
         margin: 0;
         padding: 0.65rem 0.85rem;
-        min-width: 12rem;
+        min-width: 14rem;
+        max-width: 18rem;
       }
       p {
         margin: 0 0 0.5rem;
@@ -17,11 +18,37 @@
       a {
         color: #06c;
       }
+      button {
+        display: block;
+        width: 100%;
+        margin: 0.5rem 0;
+        padding: 0.45rem 0.65rem;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .hint {
+        font-size: 0.8rem;
+        color: #444;
+        margin-top: 0.35rem;
+      }
+      #popupStatus {
+        font-size: 0.8rem;
+        color: #a00;
+        min-height: 1rem;
+      }
     </style>
   </head>
   <body>
-    <p>Open <strong>Options</strong> to configure translation backends.</p>
+    <p>
+      <button type="button" id="translateSelection">Translate selection</button>
+    </p>
+    <p class="hint">
+      Select text on the page first. If clicking here clears the selection, use
+      <strong>right‑click → Verbatim interlinear translate</strong> or the keyboard shortcut
+      (Ctrl+Shift+Y / ⌘+Shift+Y).
+    </p>
     <p><a id="openOptions" href="#">Extension options</a></p>
+    <p id="popupStatus" role="status"></p>
     <script src="popup.js"></script>
   </body>
 </html>
