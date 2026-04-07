@@ -28,15 +28,21 @@
           </label>
         </div>
 
-        <div class="row">
+        <div class="row row--toggle">
           <div class="row-label">
             <strong>Interlinear mode</strong>
             <span id="toggleSub">Off</span>
           </div>
-          <label class="switch" title="Toggle interlinear translation for this tab">
-            <input type="checkbox" id="pageToggle" />
-            <span class="slider"></span>
-          </label>
+          <div class="toggle-wrap">
+            <span id="toggleLoading" class="toggle-loading" role="status" aria-live="polite" hidden>
+              <span class="toggle-loading-spinner" aria-hidden="true"></span>
+              <span class="visually-hidden">Translating page</span>
+            </span>
+            <label class="switch" title="Toggle interlinear translation for this tab">
+              <input type="checkbox" id="pageToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
 
         <p id="popupError" class="popup-error" role="alert" hidden></p>

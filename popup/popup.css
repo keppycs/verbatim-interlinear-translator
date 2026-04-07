@@ -117,11 +117,58 @@ body.vit-ui.vit-popup .lang-select option {
   min-height: 2.5rem;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.row--toggle .toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.toggle-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.toggle-loading[hidden] {
+  display: none !important;
+}
+
+.toggle-loading-spinner {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(255, 153, 51, 0.2);
+  border-top-color: var(--vit-accent);
+  border-radius: 50%;
+  animation: vit-spin 0.75s linear infinite;
+}
+
+@keyframes vit-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .row-label {
@@ -296,5 +343,11 @@ body.vit-ui.vit-popup .lang-select option {
   .card,
   .link-options {
     transition-duration: 0.01ms !important;
+  }
+
+  .toggle-loading-spinner {
+    animation: none;
+    border-top-color: var(--vit-accent);
+    opacity: 0.85;
   }
 }

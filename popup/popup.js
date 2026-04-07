@@ -3,6 +3,7 @@ import { defaultSettings } from "../lib/defaultSettings.js";
 
 const subEl = document.getElementById("toggleSub");
 const toggleEl = document.getElementById("pageToggle");
+const loadingEl = document.getElementById("toggleLoading");
 const errorEl = document.getElementById("popupError");
 const sourceLangEl = document.getElementById("sourceLang");
 const targetLangEl = document.getElementById("targetLang");
@@ -37,6 +38,17 @@ function setSubtext(enabled) {
     subEl.textContent = enabled ? "On — whole page" : "Off";
   }
   if (toggleEl) toggleEl.checked = !!enabled;
+}
+
+/** Disables controls and shows spinner while the content script is translating. */
+function setLoading(loading) {
+  if (loadingEl) loadingEl.hidden = !loading;
+  if (toggleEl) toggleEl.disabled = !!loading;
+  if (sourceLangEl) sourceLangEl.disabled = !!loading;
+  if (targetLangEl) targetLangEl.disabled = !!loading;
+  if (loading && subEl) {
+    subEl.textContent = "Translating…";
+  }
 }
 
 function isRestrictedUrl(url) {
@@ -122,18 +134,31 @@ async function syncToggleFromTab() {
   setPopupError("");
   const tab = await getActiveTab();
   if (!tab?.id || isRestrictedUrl(tab.url || "")) {
+    setLoading(false);
     setSubtext(false);
     if (toggleEl) toggleEl.disabled = true;
     return;
   }
-  if (toggleEl) toggleEl.disabled = false;
   chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
     if (chrome.runtime.lastError) {
+      setLoading(false);
       setSubtext(false);
-      if (toggleEl) toggleEl.checked = false;
+      if (toggleEl) {
+        toggleEl.checked = false;
+        toggleEl.disabled = false;
+      }
       return;
     }
-    setSubtext(!!res?.enabled);
+    const loading = !!res?.loading;
+    const enabled = !!res?.enabled;
+    if (loading) {
+      setLoading(true);
+      if (toggleEl) toggleEl.checked = true;
+    } else {
+      setLoading(false);
+      if (toggleEl) toggleEl.disabled = false;
+      setSubtext(enabled);
+    }
   });
 }
 
@@ -151,6 +176,7 @@ document.getElementById("openOptions").addEventListener("click", (e) => {
  * @param {object|undefined} res
  */
 function applyToggleResponse(wantOn, res) {
+  setLoading(false);
   if (res?.ok === true) {
     setPopupError("");
     setSubtext(!!res.enabled);
@@ -189,6 +215,7 @@ toggleEl.addEventListener("change", async () => {
   const sendSetPage = () => {
     chrome.tabs.sendMessage(tab.id, { type: "SET_PAGE_TRANSLATION", enabled: wantOn }, (res) => {
       if (chrome.runtime.lastError) {
+        setLoading(false);
         toggleEl.checked = !wantOn;
         setSubtext(!wantOn);
         setPopupError(chrome.runtime.lastError.message);
@@ -227,6 +254,7 @@ toggleEl.addEventListener("change", async () => {
     setPopupError(NO_BACKEND_MESSAGE);
     return;
   }
+  setLoading(true);
   sendSetPage();
 });
 

@@ -24,7 +24,21 @@ function shouldSkipForSegmenter(text) {
 /** @type {boolean} */
 let pageTranslationEnabled = false;
 
+/** True while translateWholePage is running (initial or incremental). */
+let translationInProgress = false;
+
+/** Coalesce concurrent translateWholePage calls into one in-flight run. */
+let translateWholePagePromise = null;
+
+/** @type {MutationObserver | null} */
+let contentMutationObserver = null;
+
+/** @type {ReturnType<typeof setTimeout> | null} */
+let mutateDebounceTimer = null;
+
 const TRANSLATE_CHUNK_WORDS = 80;
+
+const MUTATION_DEBOUNCE_MS = 450;
 
 const NO_BACKEND_MESSAGE =
   "Add at least one translation API in Options — use “Options & API keys” in this menu.";
@@ -164,59 +178,113 @@ async function translateAllWords(flatWords, sourceLang, targetLang) {
   return { translations: allTranslations };
 }
 
-async function translateWholePage() {
-  const stored = await storageGet();
-  const targetLang = (stored.targetLang || "").trim();
-  if (!targetLang) {
-    return {
-      ok: false,
-      error: "no_target_language",
-      message: "Choose a target language in the extension toolbar menu.",
-    };
+function stopObserveNewContent() {
+  if (mutateDebounceTimer) {
+    clearTimeout(mutateDebounceTimer);
+    mutateDebounceTimer = null;
   }
-  const sourceLang = (stored.sourceLang || "auto").trim() || "auto";
-  const layoutMode = stored.layoutMode === "absolute" ? "absolute" : "inject";
+  if (contentMutationObserver) {
+    contentMutationObserver.disconnect();
+    contentMutationObserver = null;
+  }
+}
 
-  const textNodes = collectTextNodes();
-  const segments = buildSegments(textNodes);
-  if (!segments.length) {
-    return { ok: true, wordCount: 0, empty: true };
+function scheduleTranslateNewContent() {
+  if (!pageTranslationEnabled || translationInProgress) return;
+  if (mutateDebounceTimer) clearTimeout(mutateDebounceTimer);
+  mutateDebounceTimer = setTimeout(() => {
+    mutateDebounceTimer = null;
+    void translateWholePage();
+  }, MUTATION_DEBOUNCE_MS);
+}
+
+function startObserveNewContent() {
+  if (!pageTranslationEnabled || contentMutationObserver) return;
+  contentMutationObserver = new MutationObserver(() => {
+    if (!pageTranslationEnabled || translationInProgress) return;
+    scheduleTranslateNewContent();
+  });
+  contentMutationObserver.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+/**
+ * Walk the DOM for plain text not yet wrapped in interlinear spans, translate, and replace.
+ * Safe to call again when infinite scroll or SPA injects new nodes.
+ */
+function translateWholePage() {
+  if (translateWholePagePromise) {
+    return translateWholePagePromise;
   }
 
-  /** @type {{ node: Text, words: string[], originalText: string, start: number, end: number }[]} */
-  const indexed = [];
-  let offset = 0;
-  for (const seg of segments) {
-    const start = offset;
-    const end = offset + seg.words.length;
-    indexed.push({ ...seg, start, end });
-    offset = end;
-  }
-
-  const flatWords = segments.flatMap((s) => s.words);
-  const tr = await translateAllWords(flatWords, sourceLang, targetLang);
-  if (tr.error) {
-    return { ok: false, error: tr.error, message: tr.message };
-  }
-
-  const translations = tr.translations;
-
-  for (const seg of indexed) {
-    const slice = translations.slice(seg.start, seg.end);
-    if (slice.length !== seg.words.length) {
-      return { ok: false, error: "translation_mismatch" };
-    }
-    const parent = seg.node.parentNode;
-    if (!parent || !seg.node.isConnected) continue;
+  translateWholePagePromise = (async () => {
+    translationInProgress = true;
+    stopObserveNewContent();
     try {
-      const frag = buildInterlinearFragment(seg.words, slice, seg.originalText, layoutMode);
-      parent.replaceChild(frag, seg.node);
-    } catch (e) {
-      console.warn("[Verbatim]", e);
-    }
-  }
+      const stored = await storageGet();
+      const targetLang = (stored.targetLang || "").trim();
+      if (!targetLang) {
+        return {
+          ok: false,
+          error: "no_target_language",
+          message: "Choose a target language in the extension toolbar menu.",
+        };
+      }
+      const sourceLang = (stored.sourceLang || "auto").trim() || "auto";
+      const layoutMode = stored.layoutMode === "absolute" ? "absolute" : "inject";
 
-  return { ok: true, wordCount: flatWords.length };
+      const textNodes = collectTextNodes();
+      const segments = buildSegments(textNodes);
+      if (!segments.length) {
+        return { ok: true, wordCount: 0, empty: true };
+      }
+
+      /** @type {{ node: Text, words: string[], originalText: string, start: number, end: number }[]} */
+      const indexed = [];
+      let offset = 0;
+      for (const seg of segments) {
+        const start = offset;
+        const end = offset + seg.words.length;
+        indexed.push({ ...seg, start, end });
+        offset = end;
+      }
+
+      const flatWords = segments.flatMap((s) => s.words);
+      const tr = await translateAllWords(flatWords, sourceLang, targetLang);
+      if (tr.error) {
+        return { ok: false, error: tr.error, message: tr.message };
+      }
+
+      const translations = tr.translations;
+
+      for (const seg of indexed) {
+        const slice = translations.slice(seg.start, seg.end);
+        if (slice.length !== seg.words.length) {
+          return { ok: false, error: "translation_mismatch" };
+        }
+        const parent = seg.node.parentNode;
+        if (!parent || !seg.node.isConnected) continue;
+        try {
+          const frag = buildInterlinearFragment(seg.words, slice, seg.originalText, layoutMode);
+          parent.replaceChild(frag, seg.node);
+        } catch (e) {
+          console.warn("[Verbatim]", e);
+        }
+      }
+
+      return { ok: true, wordCount: flatWords.length };
+    } finally {
+      translationInProgress = false;
+      translateWholePagePromise = null;
+      if (pageTranslationEnabled) {
+        startObserveNewContent();
+      }
+    }
+  })();
+
+  return translateWholePagePromise;
 }
 
 function showToast(message) {
@@ -253,6 +321,7 @@ function showToast(message) {
 }
 
 function restorePage() {
+  stopObserveNewContent();
   const roots = Array.from(document.querySelectorAll("[data-vit-root]"));
   for (const el of roots) {
     const orig = el.getAttribute("data-vit-original-text");
@@ -296,6 +365,7 @@ async function setPageTranslationEnabled(enabled) {
         };
       }
       pageTranslationEnabled = true;
+      startObserveNewContent();
       return { ok: true, enabled: true, wordCount: r.wordCount, empty: r.empty };
     }
     restorePage();
@@ -330,7 +400,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "GET_PAGE_TRANSLATION_STATE") {
-    sendResponse({ enabled: pageTranslationEnabled });
+    sendResponse({ enabled: pageTranslationEnabled, loading: translationInProgress });
     return true;
   }
   if (msg?.type === "SET_PAGE_TRANSLATION") {
