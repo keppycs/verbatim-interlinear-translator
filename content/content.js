@@ -54,7 +54,7 @@ function checkTranslationBackendConfigured() {
         resolve({ ok: false });
         return;
       }
-      resolve(response && typeof response.ok === "boolean" ? response : { ok: false });
+      resolve({ ok: response?.ok === true });
     });
   });
 }
@@ -222,38 +222,47 @@ function restorePage() {
 }
 
 async function setPageTranslationEnabled(enabled) {
-  if (enabled) {
-    if (pageTranslationEnabled) {
-      return { ok: true, enabled: true, already: true };
-    }
-    const backendReady = await checkTranslationBackendConfigured();
-    if (!backendReady.ok) {
-      return {
-        ok: false,
-        error: "no_backend",
-        message: NO_BACKEND_MESSAGE,
-        enabled: false,
-      };
-    }
-    const r = await translateWholePage();
-    if (!r.ok) {
-      let msg = typeof r.error === "string" ? r.error : String(r.error);
-      if (r.error === "translation_mismatch") {
-        msg = "Translation could not be applied. Try again.";
+  try {
+    if (enabled) {
+      if (pageTranslationEnabled) {
+        return { ok: true, enabled: true, already: true };
       }
-      return {
-        ok: false,
-        error: r.error,
-        message: msg,
-        enabled: false,
-      };
+      const backendReady = await checkTranslationBackendConfigured();
+      if (!backendReady.ok) {
+        return {
+          ok: false,
+          error: "no_backend",
+          message: NO_BACKEND_MESSAGE,
+          enabled: false,
+        };
+      }
+      const r = await translateWholePage();
+      if (!r.ok) {
+        let msg = typeof r.error === "string" ? r.error : String(r.error);
+        if (r.error === "translation_mismatch") {
+          msg = "Translation could not be applied. Try again.";
+        }
+        return {
+          ok: false,
+          error: r.error,
+          message: msg,
+          enabled: false,
+        };
+      }
+      pageTranslationEnabled = true;
+      return { ok: true, enabled: true, wordCount: r.wordCount, empty: r.empty };
     }
-    pageTranslationEnabled = true;
-    return { ok: true, enabled: true, wordCount: r.wordCount, empty: r.empty };
+    restorePage();
+    pageTranslationEnabled = false;
+    return { ok: true, enabled: false };
+  } catch (e) {
+    return {
+      ok: false,
+      error: "exception",
+      message: e?.message || String(e),
+      enabled: false,
+    };
   }
-  restorePage();
-  pageTranslationEnabled = false;
-  return { ok: true, enabled: false };
 }
 
 async function togglePageTranslation() {

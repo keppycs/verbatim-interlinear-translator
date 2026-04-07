@@ -308,7 +308,7 @@ button#save {
   border-radius: var(--vit-radius);
   cursor: pointer;
   box-shadow: 0 4px 20px rgba(255, 153, 51, 0.35);
-  transition: transform 0.2s var(--vit-ease), box-shadow var(--vit-duration) var(--vit-ease),
+  transition: transform var(--vit-duration) var(--vit-ease), box-shadow var(--vit-duration) var(--vit-ease),
     filter var(--vit-duration) var(--vit-ease);
 }
 

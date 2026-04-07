@@ -49,8 +49,13 @@ chrome.commands.onCommand.addListener((command) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "TRANSLATION_BACKEND_READY") {
     chrome.storage.sync.get(null, (stored) => {
-      const settings = mergeSettings(stored);
-      sendResponse({ ok: hasConfiguredTranslationBackend(settings) });
+      try {
+        const settings = mergeSettings(stored);
+        const ok = hasConfiguredTranslationBackend(settings) === true;
+        sendResponse({ ok });
+      } catch {
+        sendResponse({ ok: false });
+      }
     });
     return true;
   }

@@ -2,6 +2,9 @@ const subEl = document.getElementById("toggleSub");
 const toggleEl = document.getElementById("pageToggle");
 const errorEl = document.getElementById("popupError");
 
+const NO_BACKEND_MESSAGE =
+  "Add at least one translation API in Options — use “Options & API keys” below.";
+
 function setPopupError(text) {
   if (!errorEl) return;
   if (!text) {
@@ -71,6 +74,21 @@ document.getElementById("openOptions").addEventListener("click", (e) => {
   }
 });
 
+/**
+ * @param {boolean} wantOn - target state user chose (checkbox after change)
+ * @param {object|undefined} res
+ */
+function applyToggleResponse(wantOn, res) {
+  if (res?.ok === true) {
+    setPopupError("");
+    setSubtext(!!res.enabled);
+    return;
+  }
+  toggleEl.checked = !wantOn;
+  setSubtext(!wantOn);
+  setPopupError(formatToggleError(res));
+}
+
 toggleEl.addEventListener("change", async () => {
   setPopupError("");
   const tab = await getActiveTab();
@@ -80,20 +98,38 @@ toggleEl.addEventListener("change", async () => {
     return;
   }
   const wantOn = toggleEl.checked;
-  chrome.tabs.sendMessage(tab.id, { type: "SET_PAGE_TRANSLATION", enabled: wantOn }, (res) => {
+
+  const sendSetPage = () => {
+    chrome.tabs.sendMessage(tab.id, { type: "SET_PAGE_TRANSLATION", enabled: wantOn }, (res) => {
+      if (chrome.runtime.lastError) {
+        toggleEl.checked = !wantOn;
+        setSubtext(!wantOn);
+        setPopupError(chrome.runtime.lastError.message);
+        return;
+      }
+      applyToggleResponse(wantOn, res);
+    });
+  };
+
+  if (!wantOn) {
+    sendSetPage();
+    return;
+  }
+
+  chrome.runtime.sendMessage({ type: "TRANSLATION_BACKEND_READY" }, (pref) => {
     if (chrome.runtime.lastError) {
-      toggleEl.checked = !wantOn;
+      toggleEl.checked = false;
+      setSubtext(false);
       setPopupError(chrome.runtime.lastError.message);
       return;
     }
-    if (res?.ok === false) {
+    if (pref?.ok !== true) {
       toggleEl.checked = false;
       setSubtext(false);
-      setPopupError(formatToggleError(res));
+      setPopupError(NO_BACKEND_MESSAGE);
       return;
     }
-    setPopupError("");
-    setSubtext(!!res?.enabled);
+    sendSetPage();
   });
 });
 
