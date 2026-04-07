@@ -107,7 +107,17 @@ html {
 .panel:hover {
   border-color: rgba(255, 153, 51, 0.45);
   background: linear-gradient(165deg, rgba(255, 153, 51, 0.1) 0%, var(--vit-surface-hover) 42%);
-  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 153, 51, 0.08);
+  box-shadow:
+    0 12px 44px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 153, 51, 0.08);
+}
+
+/* Panel hover: text-like inputs match the card */
+.panel:hover :is(input[type="text"], input[type="url"], input[type="password"]) {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 153, 51, 0.34);
+  box-shadow: none;
+  animation: none;
 }
 
 .panel-head {
@@ -136,7 +146,9 @@ html {
   color: var(--vit-accent);
   text-decoration: none;
   white-space: nowrap;
-  transition: color var(--vit-duration) var(--vit-ease), background var(--vit-duration) var(--vit-ease),
+  transition:
+    color var(--vit-duration) var(--vit-ease),
+    background var(--vit-duration) var(--vit-ease),
     text-decoration-color var(--vit-duration) var(--vit-ease);
 }
 
@@ -174,7 +186,9 @@ html {
   font-weight: 600;
   color: var(--vit-accent);
   text-decoration: none;
-  transition: color var(--vit-duration) var(--vit-ease), text-decoration-color var(--vit-duration) var(--vit-ease);
+  transition:
+    color var(--vit-duration) var(--vit-ease),
+    text-decoration-color var(--vit-duration) var(--vit-ease);
 }
 
 .hint-link:hover {
@@ -308,7 +322,9 @@ button#save {
   border-radius: var(--vit-radius);
   cursor: pointer;
   box-shadow: 0 4px 20px rgba(255, 153, 51, 0.35);
-  transition: transform var(--vit-duration) var(--vit-ease), box-shadow var(--vit-duration) var(--vit-ease),
+  transition:
+    transform var(--vit-duration) var(--vit-ease),
+    box-shadow var(--vit-duration) var(--vit-ease),
     filter var(--vit-duration) var(--vit-ease);
 }
 
