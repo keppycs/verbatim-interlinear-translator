@@ -1,0 +1,237 @@
+/**
+ * Verbatim — shared UI tokens & controls (options + popup)
+ * Accent #ff9933, dark surfaces, matching motion.
+ */
+
+:root {
+  --vit-accent: #ff9933;
+  --vit-accent-hover: #ffb04d;
+  --vit-accent-deep: #e07a18;
+  --vit-accent-dim: rgba(255, 153, 51, 0.22);
+  --vit-accent-muted: rgba(255, 153, 51, 0.14);
+  --vit-accent-glow: rgba(255, 153, 51, 0.45);
+  --vit-ring: rgba(255, 153, 51, 0.5);
+  --vit-bg: #0c0b0a;
+  --vit-bg-elevated: #121110;
+  --vit-surface: #181614;
+  --vit-surface-2: #262320;
+  --vit-surface-hover: #1f1d1a;
+  --vit-border: rgba(255, 255, 255, 0.06);
+  --vit-border-accent: rgba(255, 153, 51, 0.28);
+  --vit-border-strong: rgba(255, 153, 51, 0.38);
+  --vit-text: #f4f0eb;
+  --vit-muted: #9c9590;
+  --vit-radius-sm: 8px;
+  --vit-radius: 12px;
+  --vit-radius-lg: 16px;
+  --vit-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  --vit-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --vit-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --vit-duration: 0.32s;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body.vit-ui {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--vit-text);
+  background-color: var(--vit-bg);
+  background-image: radial-gradient(ellipse 90% 60% at 15% -15%, rgba(255, 153, 51, 0.11), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 100% 0%, rgba(255, 100, 40, 0.07), transparent 50%);
+  -webkit-font-smoothing: antialiased;
+}
+
+body.vit-ui.vit-popup {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+@keyframes vit-focus-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.14);
+    border-color: rgba(255, 153, 51, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.38);
+    border-color: rgba(255, 153, 51, 0.62);
+  }
+}
+
+/* Text inputs */
+input[type="text"],
+input[type="url"],
+input[type="password"] {
+  width: 100%;
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--vit-text);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--vit-border-accent);
+  border-radius: var(--vit-radius);
+  outline: none;
+  caret-color: var(--vit-accent);
+  transition:
+    border-color var(--vit-duration) var(--vit-ease),
+    background-color var(--vit-duration) var(--vit-ease),
+    box-shadow var(--vit-duration) var(--vit-ease);
+}
+
+input[type="text"]::placeholder,
+input[type="url"]::placeholder,
+input[type="password"]::placeholder {
+  color: #6b6560;
+}
+
+input[type="text"]:hover,
+input[type="url"]:hover,
+input[type="password"]:hover {
+  border-color: rgba(255, 153, 51, 0.48);
+  background: rgba(255, 153, 51, 0.04);
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  animation: vit-focus-breathe 2.35s var(--vit-ease-soft) infinite;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+/* Dropdown */
+select {
+  width: 100%;
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--vit-text);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  color-scheme: dark;
+  border-radius: var(--vit-radius);
+  outline: none;
+  border: 1px solid var(--vit-border-accent);
+  background-color: rgba(0, 0, 0, 0.32);
+  background-image: linear-gradient(180deg, rgba(255, 153, 51, 0.07) 0%, transparent 45%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%23ff9933' d='M7 9.2L2 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 0 0, right 0.8rem center;
+  background-size: auto, 14px 14px;
+  padding-right: 2.5rem;
+  transition:
+    border-color var(--vit-duration) var(--vit-ease),
+    background-color var(--vit-duration) var(--vit-ease),
+    box-shadow var(--vit-duration) var(--vit-ease);
+}
+
+select:hover {
+  border-color: rgba(255, 153, 51, 0.52);
+  background-color: rgba(255, 153, 51, 0.07);
+  background-image: linear-gradient(180deg, rgba(255, 153, 51, 0.12) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%23ffb04d' d='M7 9.2L2 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 0 0, right 0.8rem center;
+}
+
+select:focus {
+  outline: none;
+  animation: vit-focus-breathe 2.35s var(--vit-ease-soft) infinite;
+  background-color: rgba(255, 153, 51, 0.09);
+  background-image: linear-gradient(180deg, rgba(255, 153, 51, 0.14) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%23ff9933' d='M7 9.2L2 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 0 0, right 0.8rem center;
+}
+
+select option {
+  font-family: inherit;
+  font-size: 0.9375rem;
+  padding: 0.55rem 0.75rem;
+  margin: 2px 4px;
+  background-color: #1e1c19;
+  color: var(--vit-text);
+  border-radius: var(--vit-radius-sm);
+}
+
+select option:hover {
+  background: rgba(255, 153, 51, 0.2);
+}
+
+select option:checked,
+select option:focus {
+  background: linear-gradient(90deg, rgba(255, 153, 51, 0.4), rgba(255, 153, 51, 0.15));
+  color: var(--vit-text);
+}
+
+/* Options: custom checkbox (not toolbar switch) */
+.field--inline input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  flex-shrink: 0;
+  border: 2px solid var(--vit-border-accent);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  position: relative;
+  transition:
+    border-color var(--vit-duration) var(--vit-ease),
+    background-color var(--vit-duration) var(--vit-ease),
+    box-shadow var(--vit-duration) var(--vit-ease),
+    transform 0.24s var(--vit-ease);
+}
+
+.field--inline input[type="checkbox"]:hover {
+  border-color: rgba(255, 153, 51, 0.58);
+  background: rgba(255, 153, 51, 0.1);
+}
+
+.field--inline input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--vit-accent-muted);
+  animation: vit-focus-breathe 2.35s var(--vit-ease-soft) infinite;
+}
+
+.field--inline input[type="checkbox"]:active {
+  transform: scale(0.9);
+}
+
+.field--inline input[type="checkbox"]:checked {
+  background: linear-gradient(165deg, var(--vit-accent) 0%, var(--vit-accent-deep) 100%);
+  border-color: var(--vit-accent-hover);
+  box-shadow: 0 2px 12px rgba(255, 153, 51, 0.4);
+}
+
+.field--inline input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 0.28rem;
+  height: 0.52rem;
+  border: solid #1a0f05;
+  border-width: 0 2.5px 2.5px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input[type="text"]:focus,
+  input[type="url"]:focus,
+  input[type="password"]:focus,
+  select:focus,
+  .field--inline input[type="checkbox"]:focus {
+    animation: none !important;
+  }
+}
