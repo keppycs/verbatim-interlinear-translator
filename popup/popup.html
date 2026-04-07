@@ -17,6 +17,17 @@
       </div>
 
       <div class="card">
+        <div class="lang-fields" role="group" aria-label="Translation languages">
+          <label class="lang-field">
+            <span class="lang-field-label">Source language</span>
+            <select id="sourceLang" class="lang-select" title="Language of the page text"></select>
+          </label>
+          <label class="lang-field">
+            <span class="lang-field-label">Target language</span>
+            <select id="targetLang" class="lang-select" title="Language to translate into"></select>
+          </label>
+        </div>
+
         <div class="row">
           <div class="row-label">
             <strong>Interlinear mode</strong>
@@ -36,6 +47,6 @@
         <p class="hint-kbd">Shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> · Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd></p>
       </div>
     </div>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

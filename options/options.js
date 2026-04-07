@@ -32,8 +32,6 @@ function formToObject() {
     libreTranslateBaseUrl: document.getElementById("libreTranslateBaseUrl").value.trim(),
     customTranslateBaseUrl: document.getElementById("customTranslateBaseUrl").value.trim(),
     customTranslatePath: document.getElementById("customTranslatePath").value.trim() || "/translate",
-    sourceLang: document.getElementById("sourceLang").value.trim() || "auto",
-    targetLang: document.getElementById("targetLang").value.trim() || "en",
     layoutMode: document.getElementById("layoutMode").value,
   };
 }
@@ -49,8 +47,6 @@ function applyToForm(settings) {
   document.getElementById("libreTranslateBaseUrl").value = merged.libreTranslateBaseUrl || "";
   document.getElementById("customTranslateBaseUrl").value = merged.customTranslateBaseUrl || "";
   document.getElementById("customTranslatePath").value = merged.customTranslatePath || "/translate";
-  document.getElementById("sourceLang").value = merged.sourceLang || "auto";
-  document.getElementById("targetLang").value = merged.targetLang || "en";
   document.getElementById("layoutMode").value = merged.layoutMode || "inject";
 }
 

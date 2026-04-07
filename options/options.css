@@ -266,6 +266,17 @@ html {
   gap: 1rem;
 }
 
+.pair--endpoint {
+  align-items: start;
+}
+
+/* Path segment: same control chrome as URL; monospace reads as a URL path, not prose */
+.field--path input {
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  font-size: 0.90625rem;
+  letter-spacing: 0.02em;
+}
+
 @media (max-width: 520px) {
   .pair {
     grid-template-columns: 1fr;

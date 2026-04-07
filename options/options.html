@@ -15,8 +15,8 @@
             <p class="eyebrow">Extension settings</p>
             <h1>Verbatim Interlinear Translator</h1>
             <p class="tagline">
-              Connect translation providers, set languages, and choose how glosses sit on the page. Use the toolbar switch to translate the
-              whole tab.
+              Connect translation providers and choose how glosses sit on the page. Pick source and target languages in the toolbar menu,
+              then use the switch there to translate the whole tab.
             </p>
           </div>
         </div>
@@ -181,28 +181,24 @@
               <p class="hint">
                 POST JSON like LibreTranslate: <code>{ q, source, target, format }</code> → <code>{ translatedText }</code>.
               </p>
-              <label class="field">
-                <span class="field-label">Base URL</span>
-                <input type="url" id="customTranslateBaseUrl" name="customTranslateBaseUrl" />
-              </label>
-              <label class="field">
-                <span class="field-label">Path</span>
-                <input type="text" id="customTranslatePath" name="customTranslatePath" value="/translate" />
-              </label>
-            </section>
-
-            <section class="panel panel--pair" aria-labelledby="h-lang">
-              <div class="panel-head">
-                <h2 id="h-lang">Languages</h2>
-              </div>
-              <div class="pair">
+              <div class="pair pair--endpoint">
                 <label class="field">
-                  <span class="field-label">Source</span>
-                  <input type="text" id="sourceLang" name="sourceLang" placeholder="auto" />
+                  <span class="field-label">Base URL</span>
+                  <input type="url" id="customTranslateBaseUrl" name="customTranslateBaseUrl" placeholder="https://api.example.com" />
                 </label>
-                <label class="field">
-                  <span class="field-label">Target</span>
-                  <input type="text" id="targetLang" name="targetLang" placeholder="en" />
+                <label class="field field--path">
+                  <span class="field-label">Path</span>
+                  <input
+                    type="text"
+                    id="customTranslatePath"
+                    name="customTranslatePath"
+                    inputmode="url"
+                    spellcheck="false"
+                    autocomplete="off"
+                    autocapitalize="off"
+                    placeholder="/translate"
+                    value="/translate"
+                  />
                 </label>
               </div>
             </section>

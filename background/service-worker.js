@@ -48,27 +48,33 @@ chrome.commands.onCommand.addListener((command) => {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "TRANSLATION_BACKEND_READY") {
-    chrome.storage.sync.get(null, (stored) => {
+    (async () => {
       try {
+        const stored = await chrome.storage.sync.get(null);
         const settings = mergeSettings(stored);
         const ok = hasConfiguredTranslationBackend(settings) === true;
         sendResponse({ ok });
       } catch {
         sendResponse({ ok: false });
       }
-    });
+    })();
     return true;
   }
   if (msg?.type !== "TRANSLATE") return undefined;
-  chrome.storage.sync.get(null, async (stored) => {
+  (async () => {
+    const stored = await chrome.storage.sync.get(null);
     const settings = mergeSettings(stored);
-    const result = await translateWithSettings(
-      settings,
-      msg.texts || [],
-      msg.sourceLang ?? settings.sourceLang,
-      msg.targetLang ?? settings.targetLang
-    );
+    const sourceLang = msg.sourceLang ?? settings.sourceLang;
+    const targetLang = String(msg.targetLang ?? settings.targetLang ?? "").trim();
+    if (!targetLang) {
+      sendResponse({
+        error: "no_target_language",
+        message: "Choose a target language in the extension toolbar menu.",
+      });
+      return;
+    }
+    const result = await translateWithSettings(settings, msg.texts || [], sourceLang, targetLang);
     sendResponse(result);
-  });
+  })();
   return true;
 });

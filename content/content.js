@@ -35,9 +35,9 @@ function storageGet() {
   });
 }
 
-function sendTranslate(texts) {
+function sendTranslate(texts, sourceLang, targetLang) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "TRANSLATE", texts }, (response) => {
+    chrome.runtime.sendMessage({ type: "TRANSLATE", texts, sourceLang, targetLang }, (response) => {
       if (chrome.runtime.lastError) {
         resolve({ error: chrome.runtime.lastError.message });
         return;
@@ -47,16 +47,13 @@ function sendTranslate(texts) {
   });
 }
 
-function checkTranslationBackendConfigured() {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "TRANSLATION_BACKEND_READY" }, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({ ok: false });
-        return;
-      }
-      resolve({ ok: response?.ok === true });
-    });
-  });
+async function checkTranslationBackendConfigured() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "TRANSLATION_BACKEND_READY" });
+    return { ok: response?.ok === true };
+  } catch {
+    return { ok: false };
+  }
 }
 
 function yieldToMain() {
@@ -148,14 +145,16 @@ function buildSegments(textNodes) {
 
 /**
  * @param {string[]} flatWords
+ * @param {string} sourceLang
+ * @param {string} targetLang
  */
-async function translateAllWords(flatWords) {
+async function translateAllWords(flatWords, sourceLang, targetLang) {
   /** @type {string[]} */
   const allTranslations = [];
   for (let i = 0; i < flatWords.length; i += TRANSLATE_CHUNK_WORDS) {
     const chunk = flatWords.slice(i, i + TRANSLATE_CHUNK_WORDS);
-    const result = await sendTranslate(chunk);
-    if (result?.error) return { error: result.error };
+    const result = await sendTranslate(chunk, sourceLang, targetLang);
+    if (result?.error) return { error: result.error, message: result.message };
     if (!result?.translations || result.translations.length !== chunk.length) {
       return { error: "translation_mismatch" };
     }
@@ -166,6 +165,18 @@ async function translateAllWords(flatWords) {
 }
 
 async function translateWholePage() {
+  const stored = await storageGet();
+  const targetLang = (stored.targetLang || "").trim();
+  if (!targetLang) {
+    return {
+      ok: false,
+      error: "no_target_language",
+      message: "Choose a target language in the extension toolbar menu.",
+    };
+  }
+  const sourceLang = (stored.sourceLang || "auto").trim() || "auto";
+  const layoutMode = stored.layoutMode === "absolute" ? "absolute" : "inject";
+
   const textNodes = collectTextNodes();
   const segments = buildSegments(textNodes);
   if (!segments.length) {
@@ -183,14 +194,12 @@ async function translateWholePage() {
   }
 
   const flatWords = segments.flatMap((s) => s.words);
-  const tr = await translateAllWords(flatWords);
+  const tr = await translateAllWords(flatWords, sourceLang, targetLang);
   if (tr.error) {
-    return { ok: false, error: tr.error };
+    return { ok: false, error: tr.error, message: tr.message };
   }
 
   const translations = tr.translations;
-  const stored = await storageGet();
-  const layoutMode = stored.layoutMode === "absolute" ? "absolute" : "inject";
 
   for (const seg of indexed) {
     const slice = translations.slice(seg.start, seg.end);
@@ -208,6 +217,39 @@ async function translateWholePage() {
   }
 
   return { ok: true, wordCount: flatWords.length };
+}
+
+function showToast(message) {
+  const id = "vit-lang-toast";
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement("div");
+    el.id = id;
+    el.setAttribute("role", "status");
+    el.style.cssText = [
+      "position:fixed",
+      "top:16px",
+      "left:50%",
+      "transform:translateX(-50%)",
+      "z-index:2147483646",
+      "max-width:min(92vw,420px)",
+      "padding:12px 16px",
+      "border-radius:12px",
+      "font:14px/1.45 system-ui,Segoe UI,sans-serif",
+      "color:#f4f0eb",
+      "background:#1c1916",
+      "border:1px solid rgba(255,153,51,0.35)",
+      "box-shadow:0 12px 40px rgba(0,0,0,.45)",
+      "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.hidden = false;
+  clearTimeout(/** @type {any} */ (el)._vitHide);
+  /** @type {any} */ (el)._vitHide = setTimeout(() => {
+    el.hidden = true;
+  }, 4500);
 }
 
 function restorePage() {
@@ -238,9 +280,13 @@ async function setPageTranslationEnabled(enabled) {
       }
       const r = await translateWholePage();
       if (!r.ok) {
-        let msg = typeof r.error === "string" ? r.error : String(r.error);
+        let msg = r.message;
         if (r.error === "translation_mismatch") {
           msg = "Translation could not be applied. Try again.";
+        } else if (!msg && typeof r.error === "string") {
+          msg = r.error;
+        } else if (!msg) {
+          msg = String(r.error ?? "Unknown error");
         }
         return {
           ok: false,
@@ -266,7 +312,11 @@ async function setPageTranslationEnabled(enabled) {
 }
 
 async function togglePageTranslation() {
-  return setPageTranslationEnabled(!pageTranslationEnabled);
+  const res = await setPageTranslationEnabled(!pageTranslationEnabled);
+  if (!res.ok && res.error === "no_target_language" && res.message) {
+    showToast(res.message);
+  }
+  return res;
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
