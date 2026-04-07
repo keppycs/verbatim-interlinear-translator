@@ -1,0 +1,67 @@
+body {
+  font-family: system-ui, Segoe UI, sans-serif;
+  margin: 0;
+  padding: 1rem 1.25rem 2rem;
+  line-height: 1.45;
+}
+
+.wrap {
+  max-width: 40rem;
+}
+
+h1 {
+  font-size: 1.35rem;
+  margin-top: 0;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+section {
+  margin-bottom: 0.75rem;
+}
+
+label {
+  display: block;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+label.checkbox {
+  font-weight: normal;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="password"],
+select {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  margin-top: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  box-sizing: border-box;
+}
+
+.hint {
+  font-size: 0.9rem;
+  color: #444;
+  margin: 0 0 0.5rem;
+}
+
+.hint code {
+  font-size: 0.85em;
+}
+
+.status {
+  min-height: 1.25rem;
+  margin: 1rem 0;
+  color: #0a0;
+}
+
+button#save {
+  padding: 0.45rem 1rem;
+  font-size: 1rem;
+}

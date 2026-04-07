@@ -1,0 +1,16 @@
+# Dependencies (if added later)
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Secrets (never commit API keys)
+.env
+.env.*
+*.pem
+
+# Build artifacts (if added later)
+dist/
+build/

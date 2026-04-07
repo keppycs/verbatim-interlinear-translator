@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verbatim Interlinear Translator — Options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Verbatim Interlinear Translator</h1>
+
+      <section>
+        <h2>Translation backend</h2>
+        <p class="hint">
+          <strong>Auto</strong> tries providers in order: DeepL → Google Cloud Translation → Azure → LibreTranslate (URL) → Custom (URL) → on-device (when available).
+        </p>
+        <label>
+          Backend
+          <select id="translationBackend" name="translationBackend"></select>
+        </label>
+      </section>
+
+      <section>
+        <h2>DeepL API</h2>
+        <label>
+          Auth key
+          <input type="password" id="deeplAuthKey" name="deeplAuthKey" autocomplete="off" />
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="deeplUseProApi" name="deeplUseProApi" />
+          Use Pro endpoint (api.deepl.com)
+        </label>
+      </section>
+
+      <section>
+        <h2>Google Cloud Translation</h2>
+        <label>
+          API key
+          <input type="password" id="googleApiKey" name="googleApiKey" autocomplete="off" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Azure Cognitive Services (Translator)</h2>
+        <label>
+          Key
+          <input type="password" id="azureTranslatorKey" name="azureTranslatorKey" autocomplete="off" />
+        </label>
+        <label>
+          Region (if required by your resource)
+          <input type="text" id="azureTranslatorRegion" name="azureTranslatorRegion" placeholder="e.g. eastus" />
+        </label>
+      </section>
+
+      <section>
+        <h2>LibreTranslate (local or remote)</h2>
+        <label>
+          Base URL
+          <input type="url" id="libreTranslateBaseUrl" name="libreTranslateBaseUrl" placeholder="http://localhost:5000" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Custom endpoint</h2>
+        <p class="hint">POST JSON like LibreTranslate: <code>{ q, source, target, format }</code> → <code>{ translatedText }</code>.</p>
+        <label>
+          Base URL
+          <input type="url" id="customTranslateBaseUrl" name="customTranslateBaseUrl" />
+        </label>
+        <label>
+          Path
+          <input type="text" id="customTranslatePath" name="customTranslatePath" value="/translate" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Languages</h2>
+        <label>
+          Source
+          <input type="text" id="sourceLang" name="sourceLang" placeholder="auto" />
+        </label>
+        <label>
+          Target
+          <input type="text" id="targetLang" name="targetLang" placeholder="en" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Layout</h2>
+        <label>
+          Mode
+          <select id="layoutMode" name="layoutMode">
+            <option value="inject">Inject HTML (in-flow)</option>
+            <option value="absolute">Absolute positioning (no layout shift)</option>
+          </select>
+        </label>
+      </section>
+
+      <p id="status" class="status" role="status"></p>
+      <button type="button" id="save">Save</button>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
