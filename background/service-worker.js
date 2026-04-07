@@ -1,4 +1,5 @@
-import { translateWithSettings, hasConfiguredTranslationBackend } from "../lib/translation/resolve.js";
+import { translateWithCache } from "../lib/translation/cache.js";
+import { hasConfiguredTranslationBackend } from "../lib/translation/resolve.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
 
 function mergeSettings(stored) {
@@ -73,7 +74,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       });
       return;
     }
-    const result = await translateWithSettings(settings, msg.texts || [], sourceLang, targetLang);
+    const result = await translateWithCache(settings, msg.texts || [], sourceLang, targetLang);
     sendResponse(result);
   })();
   return true;

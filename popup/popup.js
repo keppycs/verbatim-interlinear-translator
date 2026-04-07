@@ -130,35 +130,48 @@ function saveLanguagesPartial(patch) {
   chrome.storage.sync.set(patch, () => void chrome.runtime.lastError);
 }
 
-async function syncToggleFromTab() {
-  setPopupError("");
-  const tab = await getActiveTab();
-  if (!tab?.id || isRestrictedUrl(tab.url || "")) {
-    setLoading(false);
-    setSubtext(false);
-    if (toggleEl) toggleEl.disabled = true;
-    return;
-  }
-  chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
-    if (chrome.runtime.lastError) {
-      setLoading(false);
-      setSubtext(false);
-      if (toggleEl) {
-        toggleEl.checked = false;
-        toggleEl.disabled = false;
+function syncToggleFromTab() {
+  return new Promise((resolve) => {
+    void (async () => {
+      setPopupError("");
+      const tab = await getActiveTab();
+      if (!tab?.id || isRestrictedUrl(tab.url || "")) {
+        setLoading(false);
+        setSubtext(false);
+        if (toggleEl) toggleEl.disabled = true;
+        resolve();
+        return;
       }
-      return;
-    }
-    const loading = !!res?.loading;
-    const enabled = !!res?.enabled;
-    if (loading) {
-      setLoading(true);
-      if (toggleEl) toggleEl.checked = true;
-    } else {
-      setLoading(false);
-      if (toggleEl) toggleEl.disabled = false;
-      setSubtext(enabled);
-    }
+      chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
+        if (chrome.runtime.lastError) {
+          setLoading(false);
+          setSubtext(false);
+          if (toggleEl) {
+            toggleEl.checked = false;
+            toggleEl.disabled = false;
+          }
+          resolve();
+          return;
+        }
+        const loading = !!res?.loading;
+        const on = !!(res?.toggleOn ?? res?.enabled ?? loading);
+        if (loading) {
+          setLoading(true);
+        } else {
+          setLoading(false);
+          if (toggleEl) toggleEl.disabled = false;
+        }
+        if (toggleEl) toggleEl.checked = on;
+        if (subEl) {
+          if (loading) {
+            subEl.textContent = "Translating…";
+          } else {
+            subEl.textContent = on ? "On — whole page" : "Off";
+          }
+        }
+        resolve();
+      });
+    })();
   });
 }
 
@@ -188,7 +201,11 @@ function applyToggleResponse(wantOn, res) {
 }
 
 buildLanguageSelects();
-syncLangFromStorage();
+
+void (async () => {
+  await syncLangFromStorage();
+  await syncToggleFromTab();
+})();
 
 sourceLangEl?.addEventListener("change", () => {
   setPopupError("");
@@ -260,9 +277,9 @@ toggleEl.addEventListener("change", async () => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
-    syncLangFromStorage();
-    syncToggleFromTab();
+    void (async () => {
+      await syncLangFromStorage();
+      await syncToggleFromTab();
+    })();
   }
 });
-
-syncToggleFromTab();

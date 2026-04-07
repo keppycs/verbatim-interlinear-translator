@@ -214,7 +214,12 @@ function startObserveNewContent() {
  * Walk the DOM for plain text not yet wrapped in interlinear spans, translate, and replace.
  * Safe to call again when infinite scroll or SPA injects new nodes.
  */
-function translateWholePage() {
+/**
+ * @param {{ activatingFirst?: boolean }} [options] - First enable: set pageTranslationEnabled before clearing loading so the popup never sees a stale "off" gap.
+ */
+function translateWholePage(options = {}) {
+  const activatingFirst = options.activatingFirst === true;
+
   if (translateWholePagePromise) {
     return translateWholePagePromise;
   }
@@ -238,6 +243,9 @@ function translateWholePage() {
       const textNodes = collectTextNodes();
       const segments = buildSegments(textNodes);
       if (!segments.length) {
+        if (activatingFirst) {
+          pageTranslationEnabled = true;
+        }
         return { ok: true, wordCount: 0, empty: true };
       }
 
@@ -274,6 +282,9 @@ function translateWholePage() {
         }
       }
 
+      if (activatingFirst) {
+        pageTranslationEnabled = true;
+      }
       return { ok: true, wordCount: flatWords.length };
     } finally {
       translationInProgress = false;
@@ -347,7 +358,7 @@ async function setPageTranslationEnabled(enabled) {
           enabled: false,
         };
       }
-      const r = await translateWholePage();
+      const r = await translateWholePage({ activatingFirst: true });
       if (!r.ok) {
         let msg = r.message;
         if (r.error === "translation_mismatch") {
@@ -364,8 +375,6 @@ async function setPageTranslationEnabled(enabled) {
           enabled: false,
         };
       }
-      pageTranslationEnabled = true;
-      startObserveNewContent();
       return { ok: true, enabled: true, wordCount: r.wordCount, empty: r.empty };
     }
     restorePage();
@@ -400,7 +409,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "GET_PAGE_TRANSLATION_STATE") {
-    sendResponse({ enabled: pageTranslationEnabled, loading: translationInProgress });
+    sendResponse({
+      enabled: pageTranslationEnabled,
+      loading: translationInProgress,
+      /** Reflects toggle: on while translating or when interlinear is active (avoids stale UI gaps). */
+      toggleOn: pageTranslationEnabled || translationInProgress,
+    });
     return true;
   }
   if (msg?.type === "SET_PAGE_TRANSLATION") {
