@@ -27,10 +27,7 @@ function primarySubtagForCompare(code) {
  * @returns {string[]}
  */
 function splitWordsWhitespaceOnly(text) {
-  return text
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  return text.trim().split(/\s+/).filter(Boolean);
 }
 
 /**
@@ -67,7 +64,11 @@ function splitWordsIntoLines(middle, flatWords) {
     offset += len;
   }
   if (offset !== flatWords.length) {
-    console.warn("[Verbatim] word/line alignment mismatch", { offset, n: flatWords.length, middle });
+    console.warn("[Verbatim] word/line alignment mismatch", {
+      offset,
+      n: flatWords.length,
+      middle,
+    });
   }
   return out;
 }
@@ -209,7 +210,13 @@ function mountInterlinearReplacement(textNodes, words, glosses, originalText, fu
     range.insertNode(frag);
     return { primary: root, wrap: null, groups: null };
   }
-  const { wrap, groups } = buildMultilineWrap(middle, words, glosses, originalText, fullTranslation);
+  const { wrap, groups } = buildMultilineWrap(
+    middle,
+    words,
+    glosses,
+    originalText,
+    fullTranslation,
+  );
   if (leading) frag.appendChild(document.createTextNode(leading));
   frag.appendChild(wrap);
   if (trailing) frag.appendChild(document.createTextNode(trailing));
@@ -340,7 +347,10 @@ function storageGet() {
 }
 
 function persistGlobalPageTranslation(enabled) {
-  chrome.storage.sync.set({ globalPageTranslation: !!enabled }, () => void chrome.runtime.lastError);
+  chrome.storage.sync.set(
+    { globalPageTranslation: !!enabled },
+    () => void chrome.runtime.lastError,
+  );
 }
 
 function sendTranslate(texts, sourceLang, targetLang) {
@@ -481,23 +491,13 @@ function formatLoadSummaryText(s) {
   if (s.empty) {
     return "Last run: no translatable text on the page.";
   }
-  const parts = [];
-  parts.push(`${s.segmentsAllCache} text segment(s) had every word gloss in the extension cache.`);
-  if (s.wordSegmentsApi > 0) {
-    parts.push(
-      `Missing glosses: ${s.missingWords} word(s) across ${s.wordSegmentsApi} segment(s) — requested via LibreTranslate.`
-    );
-  } else {
-    parts.push("Missing glosses: none — no word-level API calls.");
-  }
-  if (s.sentenceLines > 0) {
-    parts.push(
-      `Full-sentence lines: ${s.sentenceLines} (same cache/API as words, after word glosses).`
-    );
-  } else {
-    parts.push("Full-sentence lines: none (only single-word segments or no multi-word lines).");
-  }
-  return parts.join(" ");
+  const wordApi =
+    s.wordSegmentsApi > 0 ?
+      `${s.missingWords} missing word(s) / ${s.wordSegmentsApi} segment(s) — LibreTranslate`
+    : "no word-level API";
+  const sentences =
+    s.sentenceLines > 0 ? `${s.sentenceLines} full-sentence line(s)` : "no full-sentence lines";
+  return `Last: ${s.segmentsAllCache} segment(s) fully cached; ${wordApi}; ${sentences}.`;
 }
 
 /**
@@ -519,13 +519,16 @@ function friendlyBackendName(id) {
 
 function sendCacheProbe(texts, sourceLang, targetLang) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "TRANSLATE_CACHE_PROBE", texts, sourceLang, targetLang }, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({ error: chrome.runtime.lastError.message });
-        return;
-      }
-      resolve(response);
-    });
+    chrome.runtime.sendMessage(
+      { type: "TRANSLATE_CACHE_PROBE", texts, sourceLang, targetLang },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ error: chrome.runtime.lastError.message });
+          return;
+        }
+        resolve(response);
+      },
+    );
   });
 }
 
@@ -581,7 +584,13 @@ function collectTextNodes() {
       const p = t.parentElement;
       if (!p) return NodeFilter.FILTER_REJECT;
       const tag = p.tagName;
-      if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEXTAREA" || tag === "OPTION") {
+      if (
+        tag === "SCRIPT" ||
+        tag === "STYLE" ||
+        tag === "NOSCRIPT" ||
+        tag === "TEXTAREA" ||
+        tag === "OPTION"
+      ) {
         return NodeFilter.FILTER_REJECT;
       }
       if (p.closest("[data-vit-root]")) return NodeFilter.FILTER_REJECT;
@@ -670,7 +679,7 @@ function translateWholePage(options = {}) {
     translationInProgress = true;
     setTranslationStatus(
       "cache",
-      "Extension cache — each segment applies cached glosses first; missing words call the API as that segment finishes (not after the whole page)."
+      "Cached glosses first; API for gaps runs per segment as it finishes (not after the full page).",
     );
     stopObserveNewContent();
     try {
@@ -736,7 +745,7 @@ function translateWholePage(options = {}) {
             resolveFullSentenceTranslation(originalText, sourceLang, targetLang).then((fullRes) => {
               if (!fullRes.ok) return;
               if (rootRef?.isConnected) updateFullLineInRoot(rootRef, fullRes.text);
-            })
+            }),
           );
         });
       }
@@ -801,7 +810,10 @@ function translateWholePage(options = {}) {
         }
         if (!firstWordApiStatusSent) {
           firstWordApiStatusSent = true;
-          setTranslationStatus("api_words", "Translation API — missing word glosses (LibreTranslate).");
+          setTranslationStatus(
+            "api_words",
+            "Translation API — missing word glosses (LibreTranslate).",
+          );
         }
       }
 
@@ -892,7 +904,7 @@ function translateWholePage(options = {}) {
         wordApiPromises.push(
           processDeferredWordJob(job).catch((e) => {
             console.warn("[Verbatim]", e);
-          })
+          }),
         );
       }
 
@@ -932,7 +944,7 @@ function translateWholePage(options = {}) {
               words,
               glosses,
               seg.originalText,
-              null
+              null,
             );
             if (wrap && groups) {
               scheduleFullLinesForWrap(wrap, groups, scheduleFullLineDeferred);
@@ -953,7 +965,7 @@ function translateWholePage(options = {}) {
               words,
               words.map(() => null),
               seg.originalText,
-              null
+              null,
             );
             enqueueWordApi({ kind: "all_miss", primary, wrap, groups, words });
             if (wrap && groups) {
@@ -978,7 +990,7 @@ function translateWholePage(options = {}) {
             words,
             partialGlosses,
             seg.originalText,
-            null
+            null,
           );
           rootRef = wrap || primary;
           enqueueWordApi({
@@ -1014,7 +1026,7 @@ function translateWholePage(options = {}) {
       if (pendingFullLineSchedulers.length) {
         setTranslationStatus(
           "api_sentences",
-          "Full-sentence lines — after word glosses; cache first, then API (same settings)."
+          "Full-sentence lines after word glosses; cache first, then API.",
         );
       }
       for (const fn of pendingFullLineSchedulers) fn();
@@ -1178,7 +1190,8 @@ async function togglePageTranslation() {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "GET_HTML_LANG") {
-    const raw = document.documentElement.getAttribute("lang") || document.documentElement.lang || "";
+    const raw =
+      document.documentElement.getAttribute("lang") || document.documentElement.lang || "";
     sendResponse({ raw, primary: primaryLangFromHtmlLang(raw) });
     return true;
   }

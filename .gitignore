@@ -5,7 +5,7 @@ node_modules/
 dist/
 build/
 
-# Secrets (never commit API keys or signing keys)
+# Secrets
 .env
 .env.*
 *.pem

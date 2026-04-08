@@ -26,6 +26,15 @@ const NO_BACKEND_MESSAGE = "Set your LibreTranslate URL above.";
 
 const NO_TARGET_MESSAGE = "Choose a target language before turning interlinear mode on.";
 
+/** Popup has no scrollbars; keep strings short so they fit clipped message areas. */
+const POPUP_TEXT_SOFT_CAP = 420;
+
+function truncatePopupText(s, max = POPUP_TEXT_SOFT_CAP) {
+  const str = String(s);
+  if (str.length <= max) return str;
+  return `${str.slice(0, Math.max(0, max - 1))}…`;
+}
+
 /** @type {Array<{ code: string; name: string; targets: string[] }> | null} */
 let lastLanguages = null;
 
@@ -41,7 +50,7 @@ function setPopupError(text) {
     errorEl.hidden = true;
     return;
   }
-  errorEl.textContent = text;
+  errorEl.textContent = truncatePopupText(text);
   errorEl.hidden = false;
 }
 
@@ -52,7 +61,7 @@ function setLanguagesError(text) {
     languagesErrorEl.hidden = true;
     return;
   }
-  languagesErrorEl.textContent = text;
+  languagesErrorEl.textContent = truncatePopupText(text);
   languagesErrorEl.hidden = false;
 }
 
@@ -75,7 +84,7 @@ function setCacheStatus(text) {
     cacheStatusEl.hidden = true;
     return;
   }
-  cacheStatusEl.textContent = text;
+  cacheStatusEl.textContent = truncatePopupText(text);
   cacheStatusEl.hidden = false;
 }
 
@@ -365,7 +374,7 @@ async function refreshLanguagesUi() {
 }
 
 /**
- * When interlinear is on and not loading: explain the pipeline and what “On” means, plus last-run stats.
+ * When interlinear is on and not loading: show last-run stats when available.
  * @param {boolean} on
  * @param {boolean} loading
  * @param {string} [lastSummary]
@@ -376,13 +385,14 @@ function updateIdleHintForSnap(on, loading, lastSummary) {
     idleHintEl.hidden = true;
     return;
   }
-  idleHintEl.hidden = false;
-  const intro =
-    "“Interlinear on” means this tab shows glosses — not that the last run used only the cache.";
-  const order =
-    "How it runs: ① word glosses from the extension cache first (if enabled), ② missing words via LibreTranslate, ③ full-sentence lines after that.";
   const trimmed = typeof lastSummary === "string" ? lastSummary.trim() : "";
-  idleHintEl.textContent = trimmed ? `${intro}\n\n${order}\n\n${trimmed}` : `${intro}\n\n${order}`;
+  if (!trimmed) {
+    idleHintEl.textContent = "";
+    idleHintEl.hidden = true;
+    return;
+  }
+  idleHintEl.hidden = false;
+  idleHintEl.textContent = truncatePopupText(trimmed, 320);
 }
 
 /**
@@ -411,11 +421,11 @@ function formatStatusLine(phase, detail) {
   }
   switch (phase) {
     case "cache":
-      return "Reading saved glosses from the extension cache and laying out the page. No network yet.";
+      return "Loading cached glosses and layout (no network yet).";
     case "api_words":
       return "Requesting missing word glosses from LibreTranslate.";
     case "api_sentences":
-      return "Full-sentence lines: cache when this text was translated before, otherwise LibreTranslate.";
+      return "Full-sentence lines: cache first, then API.";
     default:
       return "";
   }
@@ -463,7 +473,7 @@ function setLoading(loading, phase = "idle", detail = null) {
   const effectivePhase = loading && (!phase || phase === "idle") ? "cache" : phase || "idle";
   if (statusLineEl) {
     if (loading) {
-      statusLineEl.textContent = formatStatusLine(effectivePhase, detail);
+      statusLineEl.textContent = truncatePopupText(formatStatusLine(effectivePhase, detail), 300);
       statusLineEl.hidden = false;
     } else {
       statusLineEl.textContent = "";

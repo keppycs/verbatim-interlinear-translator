@@ -9,7 +9,7 @@
   <body class="vit-ui vit-popup">
     <div class="shell">
       <div class="brand">
-        <img src="../logo.png" alt="" class="brand-mark" width="46" height="46" />
+        <img src="../logo.png" alt="" class="brand-mark" width="40" height="40" />
         <div class="brand-text">
           <h1>Verbatim Interlinear</h1>
           <p>Word-by-word gloss on the page</p>
@@ -31,7 +31,7 @@
 
         <p id="languagesError" class="popup-error popup-error--inline" role="alert" hidden></p>
 
-        <div class="lang-fields lang-fields--swap" role="group" aria-label="Translation languages">
+        <div class="lang-fields" role="group" aria-label="Translation languages">
           <label class="lang-field">
             <span class="lang-field-label">Source language</span>
             <select
@@ -41,16 +41,6 @@
               disabled
             ></select>
           </label>
-          <button
-            type="button"
-            class="btn-swap"
-            id="swapLang"
-            aria-label="Swap source and target languages"
-            title="Swap languages"
-            disabled
-          >
-            <span aria-hidden="true">⇄</span>
-          </button>
           <label class="lang-field">
             <span class="lang-field-label">Target language</span>
             <select
@@ -62,10 +52,23 @@
           </label>
         </div>
 
-        <div class="row row--cache">
+        <div class="row row--tools" role="group" aria-label="Swap languages and cache">
+          <div class="swap-lang-pair">
+            <button
+              type="button"
+              class="btn-swap"
+              id="swapLang"
+              aria-label="Swap source and target languages"
+              title="Swap languages"
+              disabled
+            >
+              <span aria-hidden="true">⇄</span>
+            </button>
+            <span class="swap-lang-caption">Switch languages</span>
+          </div>
           <label class="row-cache-label">
             <input type="checkbox" id="useTranslationCache" checked />
-            <span>Use translation cache</span>
+            <span>Use cache</span>
           </label>
           <button type="button" class="btn-clear-cache" id="clearTranslationCache">
             Clear cache
@@ -76,7 +79,7 @@
 
         <div
           class="row row--toggle"
-          title="Interlinear on: this tab shows word glosses. That does not mean everything came from cache — see the note below."
+          title="Interlinear on: glosses on this tab; not necessarily cache-only."
         >
           <div class="row-label">
             <strong>Interlinear mode</strong>
@@ -96,13 +99,7 @@
 
         <p id="statusLine" class="status-line" role="status" aria-live="polite" hidden></p>
 
-        <p
-          id="idleHint"
-          class="idle-hint"
-          role="region"
-          aria-label="How interlinear loading works"
-          hidden
-        ></p>
+        <p id="idleHint" class="idle-hint" role="region" aria-label="Last run summary" hidden></p>
 
         <p id="popupError" class="popup-error" role="alert" hidden></p>
 
