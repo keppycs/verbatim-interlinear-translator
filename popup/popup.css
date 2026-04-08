@@ -194,7 +194,15 @@ body.vit-ui.vit-popup {
   cursor: not-allowed;
 }
 
-.row--tools {
+.row--swap {
+  margin-bottom: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  justify-content: flex-start;
+}
+
+.row--cache {
   margin-bottom: 8px;
   align-items: center;
   flex-wrap: wrap;
@@ -330,9 +338,9 @@ body.vit-ui.vit-popup .lang-select option {
 }
 
 .row--toggle {
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 153, 51, 0.12);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 153, 51, 0.12);
 }
 
 .row--toggle .toggle-wrap {

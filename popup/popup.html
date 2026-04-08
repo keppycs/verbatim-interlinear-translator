@@ -17,19 +17,25 @@
       </div>
 
       <div class="card">
-        <label class="lang-field lang-field--full">
-          <span class="lang-field-label">LibreTranslate URL</span>
-          <input
-            type="url"
-            id="libreTranslateBaseUrl"
-            class="lang-input"
-            placeholder="https://libretranslate.com"
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </label>
-
-        <p id="languagesError" class="popup-error popup-error--inline" role="alert" hidden></p>
+        <div
+          class="row row--toggle"
+          title="Interlinear on: glosses on this tab; not necessarily cache-only."
+        >
+          <div class="row-label">
+            <strong>Interlinear mode</strong>
+            <span id="toggleSub">Off</span>
+          </div>
+          <div class="toggle-wrap">
+            <span id="toggleLoading" class="toggle-loading" role="status" aria-live="polite" hidden>
+              <span class="toggle-loading-spinner" aria-hidden="true"></span>
+              <span class="visually-hidden">Translating page</span>
+            </span>
+            <label class="switch" title="Toggle interlinear translation for this tab">
+              <input type="checkbox" id="pageToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
 
         <div class="lang-fields" role="group" aria-label="Translation languages">
           <label class="lang-field">
@@ -52,7 +58,7 @@
           </label>
         </div>
 
-        <div class="row row--tools" role="group" aria-label="Swap languages and cache">
+        <div class="row row--swap" role="group" aria-label="Swap languages">
           <div class="swap-lang-pair">
             <button
               type="button"
@@ -66,6 +72,23 @@
             </button>
             <span class="swap-lang-caption">Switch languages</span>
           </div>
+        </div>
+
+        <label class="lang-field lang-field--full">
+          <span class="lang-field-label">LibreTranslate URL</span>
+          <input
+            type="url"
+            id="libreTranslateBaseUrl"
+            class="lang-input"
+            placeholder="https://libretranslate.com"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+
+        <p id="languagesError" class="popup-error popup-error--inline" role="alert" hidden></p>
+
+        <div class="row row--cache" role="group" aria-label="Translation cache">
           <label class="row-cache-label">
             <input type="checkbox" id="useTranslationCache" checked />
             <span>Use cache</span>
@@ -76,26 +99,6 @@
         </div>
         <p id="legacyCacheHint" class="cache-legacy-hint" role="note" hidden></p>
         <p id="cacheStatus" class="cache-status" role="status" aria-live="polite" hidden></p>
-
-        <div
-          class="row row--toggle"
-          title="Interlinear on: glosses on this tab; not necessarily cache-only."
-        >
-          <div class="row-label">
-            <strong>Interlinear mode</strong>
-            <span id="toggleSub">Off</span>
-          </div>
-          <div class="toggle-wrap">
-            <span id="toggleLoading" class="toggle-loading" role="status" aria-live="polite" hidden>
-              <span class="toggle-loading-spinner" aria-hidden="true"></span>
-              <span class="visually-hidden">Translating page</span>
-            </span>
-            <label class="switch" title="Toggle interlinear translation for this tab">
-              <input type="checkbox" id="pageToggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
 
         <p id="statusLine" class="status-line" role="status" aria-live="polite" hidden></p>
 
