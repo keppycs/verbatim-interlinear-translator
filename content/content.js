@@ -1018,37 +1018,258 @@ function translateWholePage(options = {}) {
   return translateWholePagePromise;
 }
 
+/** Progress phase; enter/exit are separate. Keep in sync with `injectVitToast`. */
+const VIT_TOAST_PROGRESS_MS = 4500;
+/** Snappier entrance; exit matches duration for symmetric motion. */
+const VIT_TOAST_ENTER_MS = 300;
+const VIT_TOAST_EXIT_MS = 300;
+
+function vitToastCancelPending(root) {
+  const t = /** @type {any} */ (root)._vitHide;
+  if (t) clearTimeout(t);
+  /** @type {any} */ (root)._vitHide = null;
+  for (const k of ["_vitEnter", "_vitAnim", "_vitExit", "_vitIdleAnim"]) {
+    const a = /** @type {any} */ (root)[k];
+    if (a && typeof a.cancel === "function") {
+      try {
+        a.cancel();
+      } catch {
+        /* ignore */
+      }
+    }
+    /** @type {any} */ (root)[k] = null;
+  }
+}
+
+/**
+ * Pause the linear progress while hovered; soft “idle” pulse on the accent bar.
+ * @param {HTMLElement} shell
+ * @param {HTMLElement} bar
+ * @param {Animation} barAnim
+ * @param {HTMLElement} root
+ * @param {{ reduced: boolean }} opts
+ */
+function vitToastAttachHover(shell, bar, barAnim, root, opts) {
+  const reduced = opts.reduced;
+  let idleAnim = null;
+
+  const stopIdle = () => {
+    if (idleAnim) {
+      try {
+        idleAnim.cancel();
+      } catch {
+        /* ignore */
+      }
+      idleAnim = null;
+    }
+    /** @type {any} */ (root)._vitIdleAnim = null;
+    bar.style.boxShadow = "";
+    bar.style.filter = "";
+  };
+
+  const startIdle = () => {
+    stopIdle();
+    if (reduced) {
+      idleAnim = bar.animate(
+        [{ boxShadow: "0 0 8px rgba(255,153,51,0.35)" }, { boxShadow: "0 0 18px rgba(255,153,51,0.75)" }, { boxShadow: "0 0 8px rgba(255,153,51,0.35)" }],
+        { duration: 1600, iterations: Infinity, easing: "ease-in-out" },
+      );
+    } else {
+      idleAnim = bar.animate(
+        [
+          { boxShadow: "0 0 10px rgba(255,153,51,0.45)", filter: "brightness(1)" },
+          { boxShadow: "0 0 26px rgba(255,153,51,0.95)", filter: "brightness(1.12)" },
+          { boxShadow: "0 0 10px rgba(255,153,51,0.45)", filter: "brightness(1)" },
+        ],
+        { duration: 1500, iterations: Infinity, easing: "ease-in-out" },
+      );
+    }
+    /** @type {any} */ (root)._vitIdleAnim = idleAnim;
+  };
+
+  shell.addEventListener("pointerenter", () => {
+    if (barAnim.playState === "finished") return;
+    try {
+      barAnim.pause();
+    } catch {
+      /* ignore */
+    }
+    startIdle();
+  });
+
+  shell.addEventListener("pointerleave", () => {
+    stopIdle();
+    if (barAnim.playState === "finished") return;
+    try {
+      barAnim.play();
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
 function showToast(message) {
   const id = "vit-lang-toast";
-  let el = document.getElementById(id);
-  if (!el) {
-    el = document.createElement("div");
-    el.id = id;
-    el.setAttribute("role", "status");
-    el.style.cssText = [
-      "position:fixed",
-      "top:16px",
-      "left:50%",
-      "transform:translateX(-50%)",
-      "z-index:2147483646",
-      "max-width:min(92vw,420px)",
-      "padding:12px 16px",
-      "border-radius:12px",
-      "font:14px/1.45 system-ui,Segoe UI,sans-serif",
-      "color:#f4f0eb",
-      "background:#1c1916",
-      "border:1px solid rgba(255,153,51,0.35)",
-      "box-shadow:0 12px 40px rgba(0,0,0,.45)",
-      "pointer-events:none",
-    ].join(";");
-    (document.body || document.documentElement).appendChild(el);
+  let root = document.getElementById(id);
+  if (!root) {
+    root = document.createElement("div");
+    root.id = id;
+    root.setAttribute("role", "status");
+    (document.body || document.documentElement).appendChild(root);
   }
-  el.textContent = message;
-  el.removeAttribute("hidden");
-  clearTimeout(/** @type {any} */ (el)._vitHide);
-  /** @type {any} */ (el)._vitHide = setTimeout(() => {
-    el.hidden = true;
-  }, 4500);
+
+  vitToastCancelPending(root);
+
+  root.replaceChildren();
+
+  const shell = document.createElement("div");
+  shell.style.cssText = [
+    "overflow:hidden",
+    "border-radius:20px",
+    "max-width:min(96vw,700px)",
+    "min-width:min(96vw,340px)",
+    "background:linear-gradient(165deg,#34312c 0%,#262320 42%,#181614 100%)",
+    "border:1px solid rgba(255,153,51,0.55)",
+    "box-shadow:0 22px 64px rgba(0,0,0,.58),0 0 0 1px rgba(255,153,51,0.14),0 0 48px rgba(255,153,51,0.24)",
+    "pointer-events:auto",
+    "cursor:default",
+    "will-change:transform,opacity",
+  ].join(";");
+
+  const msgEl = document.createElement("div");
+  msgEl.textContent = message;
+  msgEl.style.cssText = [
+    "padding:24px 32px 18px",
+    "font:19px/1.55 system-ui,Segoe UI,sans-serif",
+    "color:#f4f0eb",
+    "text-shadow:0 1px 2px rgba(0,0,0,0.4)",
+  ].join(";");
+
+  const track = document.createElement("div");
+  track.style.cssText = "position:relative;height:7px;background:rgba(0,0,0,0.4);overflow:hidden;";
+
+  const bar = document.createElement("div");
+  bar.style.cssText = [
+    "height:100%",
+    "width:100%",
+    "transform-origin:0 50%",
+    "background:linear-gradient(90deg,#ffb04d,#ff9933,#e07a18)",
+    "box-shadow:0 0 16px rgba(255,153,51,0.7)",
+  ].join(";");
+
+  track.appendChild(bar);
+  shell.appendChild(msgEl);
+  shell.appendChild(track);
+  root.appendChild(shell);
+
+  root.style.cssText = [
+    "position:fixed",
+    "top:12px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "z-index:2147483646",
+  ].join(";");
+
+  root.removeAttribute("hidden");
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const finishHide = () => {
+    root.hidden = true;
+  };
+
+  try {
+    if (reduced) {
+      shell.style.opacity = "1";
+      bar.style.opacity = "0.85";
+      const barAnim = bar.animate(
+        [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
+        { duration: VIT_TOAST_PROGRESS_MS, easing: "linear", fill: "forwards" },
+      );
+      /** @type {any} */ (root)._vitAnim = barAnim;
+      vitToastAttachHover(shell, bar, barAnim, root, { reduced: true });
+      void barAnim.finished
+        .then(() => {
+          const fade = shell.animate([{ opacity: 1 }, { opacity: 0 }], {
+            duration: 180,
+            easing: "ease-out",
+            fill: "forwards",
+          });
+          /** @type {any} */ (root)._vitExit = fade;
+          return fade.finished;
+        })
+        .then(finishHide)
+        .catch(() => {});
+      return;
+    }
+
+    const enter = shell.animate(
+      [
+        {
+          transform: "translateY(-44px) scale(0.92)",
+          opacity: 0,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
+        {
+          transform: "translateY(4px) scale(1.015)",
+          opacity: 1,
+          offset: 0.58,
+          easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+        },
+        {
+          transform: "translateY(-2px) scale(0.998)",
+          opacity: 1,
+          offset: 0.82,
+          easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+        },
+        { transform: "translateY(0) scale(1)", opacity: 1, offset: 1 },
+      ],
+      { duration: VIT_TOAST_ENTER_MS, fill: "both" },
+    );
+    /** @type {any} */ (root)._vitEnter = enter;
+
+    void enter.finished
+      .then(() => {
+        const barAnim = bar.animate(
+          [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
+          { duration: VIT_TOAST_PROGRESS_MS, easing: "linear", fill: "forwards" },
+        );
+        /** @type {any} */ (root)._vitAnim = barAnim;
+        vitToastAttachHover(shell, bar, barAnim, root, { reduced: false });
+        return barAnim.finished;
+      })
+      .then(() => {
+        const exit = shell.animate(
+          [
+            {
+              transform: "translateY(0) scale(1)",
+              opacity: 1,
+              easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+            },
+            {
+              transform: "translateY(-2px) scale(0.998)",
+              opacity: 1,
+              offset: 0.18,
+              easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+            },
+            {
+              transform: "translateY(4px) scale(1.015)",
+              opacity: 1,
+              offset: 0.4,
+              easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+            },
+            { transform: "translateY(-44px) scale(0.92)", opacity: 0, offset: 1 },
+          ],
+          { duration: VIT_TOAST_EXIT_MS, fill: "forwards" },
+        );
+        /** @type {any} */ (root)._vitExit = exit;
+        return exit.finished;
+      })
+      .then(finishHide)
+      .catch(() => {});
+  } catch {
+    /** @type {any} */ (root)._vitHide = setTimeout(finishHide, VIT_TOAST_ENTER_MS + VIT_TOAST_PROGRESS_MS + VIT_TOAST_EXIT_MS);
+  }
 }
 
 function restorePage() {

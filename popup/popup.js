@@ -2,6 +2,7 @@ import { defaultSettings } from "../lib/defaultSettings.js";
 import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
 import { toLibreStyleLang } from "../lib/translation/libreStyleLang.js";
 import { isLegacyCompat } from "../lib/compat.js";
+import { ensureVitContentScript } from "../lib/ensureVitContentScript.js";
 import { mountCustomSelect } from "./customSelect.js";
 
 /** Browsers without `chrome.storage.session` — translation cache is forced off in the service worker. */
@@ -9,10 +10,6 @@ const legacyMode = isLegacyCompat();
 
 const subEl = document.getElementById("toggleSub");
 
-/** Visible line under the toggles — always prefixed for clarity. */
-function statusMenuText(body) {
-  return `Status: ${body}`;
-}
 const toggleEl = document.getElementById("pageToggle");
 const loadingEl = document.getElementById("toggleLoading");
 const sourceLangEl = document.getElementById("sourceLang");
@@ -23,7 +20,6 @@ const useCacheEl = document.getElementById("useTranslationCache");
 const syncPageTranslationAcrossTabsEl = document.getElementById("syncPageTranslationAcrossTabs");
 const clearCacheEl = document.getElementById("clearTranslationCache");
 const legacyCacheHintEl = document.getElementById("legacyCacheHint");
-const cacheStatusEl = document.getElementById("cacheStatus");
 
 const NO_BACKEND_MESSAGE = "Set your LibreTranslate URL above.";
 
@@ -37,7 +33,7 @@ function resyncLanguageSelectUis() {
   resyncTargetSelectUi();
 }
 
-const NO_TARGET_MESSAGE = "Choose a target language before turning interlinear mode on.";
+const NO_TARGET_MESSAGE = "Choose a target language before translating";
 
 /** Popup has no scrollbars; keep strings short so they fit clipped message areas. */
 const POPUP_TEXT_SOFT_CAP = 420;
@@ -62,40 +58,247 @@ let baseUrlDebounceTimer = null;
 /**
  * Injected when `tabs.sendMessage` fails (content script not ready / no receiver).
  * Must be self-contained — serialized into the tab by `scripting.executeScript`.
+ * Keep in sync with `showToast` in content/content.js (enter → timer → exit).
  * @param {string} toastText
  */
 function injectVitToast(toastText) {
+  const PROGRESS_MS = 4500;
+  const ENTER_MS = 300;
+  const EXIT_MS = 300;
   const id = "vit-lang-toast";
-  let el = document.getElementById(id);
-  if (!el) {
-    el = document.createElement("div");
-    el.id = id;
-    el.setAttribute("role", "status");
-    el.style.cssText = [
-      "position:fixed",
-      "top:16px",
-      "left:50%",
-      "transform:translateX(-50%)",
-      "z-index:2147483646",
-      "max-width:min(92vw,420px)",
-      "padding:12px 16px",
-      "border-radius:12px",
-      "font:14px/1.45 system-ui,Segoe UI,sans-serif",
-      "color:#f4f0eb",
-      "background:#1c1916",
-      "border:1px solid rgba(255,153,51,0.35)",
-      "box-shadow:0 12px 40px rgba(0,0,0,.45)",
-      "pointer-events:none",
-    ].join(";");
-    (document.body || document.documentElement).appendChild(el);
+  let root = document.getElementById(id);
+  if (!root) {
+    root = document.createElement("div");
+    root.id = id;
+    root.setAttribute("role", "status");
+    (document.body || document.documentElement).appendChild(root);
   }
-  el.textContent = toastText;
-  el.removeAttribute("hidden");
-  const prev = /** @type {any} */ (el)._vitHide;
-  if (prev) clearTimeout(prev);
-  /** @type {any} */ (el)._vitHide = setTimeout(() => {
-    el.hidden = true;
-  }, 4500);
+  const t = /** @type {any} */ (root)._vitHide;
+  if (t) clearTimeout(t);
+  /** @type {any} */ (root)._vitHide = null;
+  for (const k of ["_vitEnter", "_vitAnim", "_vitExit", "_vitIdleAnim"]) {
+    const a = /** @type {any} */ (root)[k];
+    if (a && typeof a.cancel === "function") {
+      try {
+        a.cancel();
+      } catch {
+        /* ignore */
+      }
+    }
+    /** @type {any} */ (root)[k] = null;
+  }
+
+  root.replaceChildren();
+
+  const shell = document.createElement("div");
+  shell.style.cssText = [
+    "overflow:hidden",
+    "border-radius:20px",
+    "max-width:min(96vw,700px)",
+    "min-width:min(96vw,340px)",
+    "background:linear-gradient(165deg,#34312c 0%,#262320 42%,#181614 100%)",
+    "border:1px solid rgba(255,153,51,0.55)",
+    "box-shadow:0 22px 64px rgba(0,0,0,.58),0 0 0 1px rgba(255,153,51,0.14),0 0 48px rgba(255,153,51,0.24)",
+    "pointer-events:auto",
+    "cursor:default",
+    "will-change:transform,opacity",
+  ].join(";");
+
+  const msgEl = document.createElement("div");
+  msgEl.textContent = toastText;
+  msgEl.style.cssText = [
+    "padding:24px 32px 18px",
+    "font:19px/1.55 system-ui,Segoe UI,sans-serif",
+    "color:#f4f0eb",
+    "text-shadow:0 1px 2px rgba(0,0,0,0.4)",
+  ].join(";");
+
+  const track = document.createElement("div");
+  track.style.cssText = "position:relative;height:7px;background:rgba(0,0,0,0.4);overflow:hidden;";
+
+  const bar = document.createElement("div");
+  bar.style.cssText = [
+    "height:100%",
+    "width:100%",
+    "transform-origin:0 50%",
+    "background:linear-gradient(90deg,#ffb04d,#ff9933,#e07a18)",
+    "box-shadow:0 0 16px rgba(255,153,51,0.7)",
+  ].join(";");
+
+  track.appendChild(bar);
+  shell.appendChild(msgEl);
+  shell.appendChild(track);
+  root.appendChild(shell);
+
+  root.style.cssText = [
+    "position:fixed",
+    "top:12px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "z-index:2147483646",
+  ].join(";");
+
+  root.removeAttribute("hidden");
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const finishHide = () => {
+    root.hidden = true;
+  };
+
+  /** Mirrors `vitToastAttachHover` in content/content.js (inlined for executeScript). */
+  function attachVitToastHover(shellEl, barEl, barAnim, rootEl, reducedMotion) {
+    let idleAnim = null;
+    const stopIdle = () => {
+      if (idleAnim) {
+        try {
+          idleAnim.cancel();
+        } catch {
+          /* ignore */
+        }
+        idleAnim = null;
+      }
+      /** @type {any} */ (rootEl)._vitIdleAnim = null;
+      barEl.style.boxShadow = "";
+      barEl.style.filter = "";
+    };
+    const startIdle = () => {
+      stopIdle();
+      if (reducedMotion) {
+        idleAnim = barEl.animate(
+          [
+            { boxShadow: "0 0 8px rgba(255,153,51,0.35)" },
+            { boxShadow: "0 0 18px rgba(255,153,51,0.75)" },
+            { boxShadow: "0 0 8px rgba(255,153,51,0.35)" },
+          ],
+          { duration: 1600, iterations: Infinity, easing: "ease-in-out" },
+        );
+      } else {
+        idleAnim = barEl.animate(
+          [
+            { boxShadow: "0 0 10px rgba(255,153,51,0.45)", filter: "brightness(1)" },
+            { boxShadow: "0 0 26px rgba(255,153,51,0.95)", filter: "brightness(1.12)" },
+            { boxShadow: "0 0 10px rgba(255,153,51,0.45)", filter: "brightness(1)" },
+          ],
+          { duration: 1500, iterations: Infinity, easing: "ease-in-out" },
+        );
+      }
+      /** @type {any} */ (rootEl)._vitIdleAnim = idleAnim;
+    };
+    shellEl.addEventListener("pointerenter", () => {
+      if (barAnim.playState === "finished") return;
+      try {
+        barAnim.pause();
+      } catch {
+        /* ignore */
+      }
+      startIdle();
+    });
+    shellEl.addEventListener("pointerleave", () => {
+      stopIdle();
+      if (barAnim.playState === "finished") return;
+      try {
+        barAnim.play();
+      } catch {
+        /* ignore */
+      }
+    });
+  }
+
+  try {
+    if (reduced) {
+      shell.style.opacity = "1";
+      bar.style.opacity = "0.85";
+      const barAnim = bar.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], {
+        duration: PROGRESS_MS,
+        easing: "linear",
+        fill: "forwards",
+      });
+      /** @type {any} */ (root)._vitAnim = barAnim;
+      attachVitToastHover(shell, bar, barAnim, root, true);
+      void barAnim.finished
+        .then(() => {
+          const fade = shell.animate([{ opacity: 1 }, { opacity: 0 }], {
+            duration: 180,
+            easing: "ease-out",
+            fill: "forwards",
+          });
+          /** @type {any} */ (root)._vitExit = fade;
+          return fade.finished;
+        })
+        .then(finishHide)
+        .catch(() => {});
+      return;
+    }
+
+    const enter = shell.animate(
+      [
+        {
+          transform: "translateY(-44px) scale(0.92)",
+          opacity: 0,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
+        {
+          transform: "translateY(4px) scale(1.015)",
+          opacity: 1,
+          offset: 0.58,
+          easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+        },
+        {
+          transform: "translateY(-2px) scale(0.998)",
+          opacity: 1,
+          offset: 0.82,
+          easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+        },
+        { transform: "translateY(0) scale(1)", opacity: 1, offset: 1 },
+      ],
+      { duration: ENTER_MS, fill: "both" },
+    );
+    /** @type {any} */ (root)._vitEnter = enter;
+
+    void enter.finished
+      .then(() => {
+        const barAnim = bar.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], {
+          duration: PROGRESS_MS,
+          easing: "linear",
+          fill: "forwards",
+        });
+        /** @type {any} */ (root)._vitAnim = barAnim;
+        attachVitToastHover(shell, bar, barAnim, root, false);
+        return barAnim.finished;
+      })
+      .then(() => {
+        const exit = shell.animate(
+          [
+            {
+              transform: "translateY(0) scale(1)",
+              opacity: 1,
+              easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+            },
+            {
+              transform: "translateY(-2px) scale(0.998)",
+              opacity: 1,
+              offset: 0.18,
+              easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+            },
+            {
+              transform: "translateY(4px) scale(1.015)",
+              opacity: 1,
+              offset: 0.4,
+              easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+            },
+            { transform: "translateY(-44px) scale(0.92)", opacity: 0, offset: 1 },
+          ],
+          { duration: EXIT_MS, fill: "forwards" },
+        );
+        /** @type {any} */ (root)._vitExit = exit;
+        return exit.finished;
+      })
+      .then(finishHide)
+      .catch(() => {});
+  } catch {
+    /** @type {any} */ (root)._vitHide = setTimeout(finishHide, ENTER_MS + PROGRESS_MS + EXIT_MS);
+  }
 }
 
 /**
@@ -127,6 +330,21 @@ async function toastOnActiveTab(text) {
   });
 
   if (delivered) return;
+
+  const ok = await ensureVitContentScript(tab.id);
+  if (ok) {
+    const delivered2 = await new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tab.id, { type: "VIT_TOAST", message: msg }, () => {
+          if (chrome.runtime.lastError) resolve(false);
+          else resolve(true);
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+    if (delivered2) return;
+  }
 
   try {
     await chrome.scripting.executeScript({
@@ -161,17 +379,6 @@ function applyLegacyCacheUi() {
   }
 }
 
-function setCacheStatus(text) {
-  if (!cacheStatusEl) return;
-  if (!text) {
-    cacheStatusEl.textContent = "";
-    cacheStatusEl.hidden = true;
-    return;
-  }
-  cacheStatusEl.textContent = truncatePopupText(text);
-  cacheStatusEl.hidden = false;
-}
-
 function formatToggleError(res) {
   if (res?.message) return res.message;
   const e = res?.error;
@@ -189,7 +396,7 @@ function formatToggleError(res) {
 
 function setSubtext(enabled) {
   if (subEl) {
-    subEl.textContent = statusMenuText(enabled ? "Interlinear on" : "Off");
+    subEl.textContent = enabled ? "Translation done" : "Translation off";
   }
   if (toggleEl) toggleEl.checked = !!enabled;
 }
@@ -305,6 +512,8 @@ function setAutoSourceOptionLabel(text) {
 async function getHtmlLangPrimaryForActiveTab() {
   const tab = await getActiveTab();
   if (!tab?.id || isRestrictedUrl(tab.url || "")) return null;
+  const ready = await ensureVitContentScript(tab.id);
+  if (!ready) return null;
   const resp = await new Promise((resolve) => {
     chrome.tabs.sendMessage(tab.id, { type: "GET_HTML_LANG" }, (r) => {
       if (chrome.runtime.lastError) resolve(null);
@@ -317,6 +526,8 @@ async function getHtmlLangPrimaryForActiveTab() {
 
 /**
  * Label Auto using the active tab’s &lt;html lang&gt; and Libre or Intl names.
+ * Uses the same rule as fixed source options: if Libre lists no non-self targets for that code,
+ * the resolved “Auto” source cannot translate — show that explicitly instead of “Auto (Italian)”.
  * @param {string | null | undefined} [htmlPrimaryHint] - when passed (including null), avoids GET_HTML_LANG
  */
 async function refreshAutoSourceLabel(htmlPrimaryHint) {
@@ -328,7 +539,8 @@ async function refreshAutoSourceLabel(htmlPrimaryHint) {
     return;
   }
   const name = labelForAutoParenthetical(lastLanguages, primary);
-  setAutoSourceOptionLabel(`Auto (${name})`);
+  const canUseAsSource = fixedSourceHasNonSelfTarget(lastLanguages, primary);
+  setAutoSourceOptionLabel(canUseAsSource ? `Auto (${name})` : `Auto (${name} - unavailable)`);
 }
 
 /**
@@ -521,7 +733,7 @@ function setLoading(loading, phase = "idle", detail = null) {
   if (clearCacheEl) clearCacheEl.disabled = !!loading || legacyMode;
   const effectivePhase = loading && (!phase || phase === "idle") ? "cache" : phase || "idle";
   if (loading && subEl) {
-    subEl.textContent = statusMenuText(formatStatusSub(effectivePhase));
+    subEl.textContent = formatStatusSub(effectivePhase);
   }
   if (loading) {
     startTabStatePoll();
@@ -547,7 +759,10 @@ async function getActiveTab() {
 }
 
 async function getGlobalPageTranslationOn() {
-  const o = await chrome.storage.sync.get(["syncPageTranslationAcrossTabs", "globalPageTranslation"]);
+  const o = await chrome.storage.sync.get([
+    "syncPageTranslationAcrossTabs",
+    "globalPageTranslation",
+  ]);
   return o?.syncPageTranslationAcrossTabs === true && o?.globalPageTranslation === true;
 }
 
@@ -589,7 +804,7 @@ function applyTabStateSnapshot(snap, globalOn = false) {
   }
   if (toggleEl) toggleEl.checked = on;
   if (subEl && !loading) {
-    subEl.textContent = statusMenuText(on ? "Interlinear on" : "Off");
+    subEl.textContent = on ? "Translation done" : "Translation off";
   }
 }
 
@@ -623,6 +838,12 @@ function syncToggleFromTab() {
         return;
       }
       await applySessionSnapshotForTab(tab.id, globalOn);
+      const ready = await ensureVitContentScript(tab.id);
+      if (!ready) {
+        applyTabStateSnapshot({ toggleOn: globalOn, enabled: false, loading: false }, globalOn);
+        resolve();
+        return;
+      }
       chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
         if (chrome.runtime.lastError) {
           applyTabStateSnapshot({ toggleOn: globalOn, enabled: false, loading: false }, globalOn);
@@ -688,15 +909,13 @@ useCacheEl?.addEventListener("change", () => {
 });
 
 clearCacheEl?.addEventListener("click", () => {
-  setCacheStatus("");
   chrome.runtime.sendMessage({ type: "CLEAR_TRANSLATION_CACHE" }, (res) => {
     if (chrome.runtime.lastError) {
       void toastOnActiveTab(chrome.runtime.lastError.message || "Could not clear cache.");
       return;
     }
     if (res?.ok) {
-      setCacheStatus("Translation cache cleared.");
-      setTimeout(() => setCacheStatus(""), 2500);
+      void toastOnActiveTab("Translation cache cleared.");
     } else {
       void toastOnActiveTab(res?.error || "Could not clear cache.");
     }
@@ -771,6 +990,8 @@ chrome.storage.sync.onChanged.addListener((changes) => {
       if (toggleEl) toggleEl.checked = globalOn;
       return;
     }
+    const ready = await ensureVitContentScript(tab.id);
+    if (!ready) return;
     chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
       if (chrome.runtime.lastError) return;
       applyTabStateSnapshot(res, globalOn);
@@ -782,22 +1003,28 @@ syncPageTranslationAcrossTabsEl?.addEventListener("change", () => {
   const on = !!syncPageTranslationAcrossTabsEl.checked;
   void (async () => {
     if (!on) {
-      await saveLanguagesPartial({ syncPageTranslationAcrossTabs: false, globalPageTranslation: false });
+      await saveLanguagesPartial({
+        syncPageTranslationAcrossTabs: false,
+        globalPageTranslation: false,
+      });
       await syncToggleFromTab();
       return;
     }
     const tab = await getActiveTab();
     let interlinearOn = false;
     if (tab?.id && !isRestrictedUrl(tab.url || "")) {
-      interlinearOn = await new Promise((resolve) => {
-        chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
-          if (chrome.runtime.lastError) {
-            resolve(false);
-            return;
-          }
-          resolve(!!(res?.toggleOn ?? res?.enabled));
+      const ready = await ensureVitContentScript(tab.id);
+      if (ready) {
+        interlinearOn = await new Promise((resolve) => {
+          chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
+            if (chrome.runtime.lastError) {
+              resolve(false);
+              return;
+            }
+            resolve(!!(res?.toggleOn ?? res?.enabled));
+          });
         });
-      });
+      }
     }
     await saveLanguagesPartial({
       syncPageTranslationAcrossTabs: true,
@@ -835,6 +1062,13 @@ toggleEl?.addEventListener("change", async () => {
     if (syncSnap?.syncPageTranslationAcrossTabs === true) {
       await saveLanguagesPartial({ globalPageTranslation: false });
     }
+    const readyOff = await ensureVitContentScript(tab.id);
+    if (!readyOff) {
+      toggleEl.checked = true;
+      setSubtext(true);
+      setPopupError("Could not connect to this page. Try refreshing it.");
+      return;
+    }
     sendSetPage();
     return;
   }
@@ -864,6 +1098,14 @@ toggleEl?.addEventListener("change", async () => {
     return;
   }
   setLoading(true, "cache", null);
+  const readyOn = await ensureVitContentScript(tab.id);
+  if (!readyOn) {
+    setLoading(false);
+    toggleEl.checked = false;
+    setSubtext(false);
+    setPopupError("Could not connect to this page. Try refreshing it.");
+    return;
+  }
   sendSetPage();
 });
 

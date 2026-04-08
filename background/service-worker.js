@@ -4,6 +4,7 @@ import { defaultSettings } from "../lib/defaultSettings.js";
 import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
 import { fetchLibreLanguages } from "../lib/translation/fetchLibreLanguages.js";
 import { isLegacyCompat } from "../lib/compat.js";
+import { ensureVitContentScript } from "../lib/ensureVitContentScript.js";
 
 function mergeSettings(stored) {
   const m = { ...defaultSettings, ...stored };
@@ -52,14 +53,23 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== "vit-toggle-page" || tab?.id == null) return;
-  chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PAGE_TRANSLATION" });
+  void (async () => {
+    const ok = await ensureVitContentScript(tab.id);
+    if (!ok) return;
+    chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PAGE_TRANSLATION" });
+  })();
 });
 
 chrome.commands.onCommand.addListener((command) => {
   if (command !== "toggle-page-translation") return;
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const id = tabs[0]?.id;
-    if (id != null) chrome.tabs.sendMessage(id, { type: "TOGGLE_PAGE_TRANSLATION" });
+    if (id == null) return;
+    void (async () => {
+      const ok = await ensureVitContentScript(id);
+      if (!ok) return;
+      chrome.tabs.sendMessage(id, { type: "TOGGLE_PAGE_TRANSLATION" });
+    })();
   });
 });
 
