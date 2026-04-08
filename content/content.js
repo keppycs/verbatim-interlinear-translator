@@ -282,12 +282,6 @@ let translationStatusPhase = "idle";
 /** @type {string | null} */
 let translationStatusDetail = null;
 
-/**
- * Last successful run summary for the popup (one line).
- * @type {string | null}
- */
-let lastLoadSummaryText = null;
-
 /** Coalesce concurrent translateWholePage calls into one in-flight run. */
 let translateWholePagePromise = null;
 
@@ -346,7 +340,11 @@ function storageGet() {
   });
 }
 
+/** When true, `globalPageTranslation` in sync storage mirrors on/off across tabs. */
+let syncPageTranslationAcrossTabs = false;
+
 function persistGlobalPageTranslation(enabled) {
+  if (!syncPageTranslationAcrossTabs) return;
   chrome.storage.sync.set(
     { globalPageTranslation: !!enabled },
     () => void chrome.runtime.lastError,
@@ -472,32 +470,9 @@ function broadcastVitState() {
         toggleOn: pageTranslationEnabled || translationInProgress,
         statusPhase: translationStatusPhase,
         statusDetail: translationStatusDetail,
-        lastLoadSummary: lastLoadSummaryText,
       },
     })
     .catch(() => {});
-}
-
-/**
- * @param {{
- *   segmentsAllCache: number,
- *   wordSegmentsApi: number,
- *   missingWords: number,
- *   sentenceLines: number,
- *   empty?: boolean,
- * }} s
- */
-function formatLoadSummaryText(s) {
-  if (s.empty) {
-    return "Last run: no translatable text on the page.";
-  }
-  const wordApi =
-    s.wordSegmentsApi > 0 ?
-      `${s.missingWords} missing word(s) / ${s.wordSegmentsApi} segment(s) — LibreTranslate`
-    : "no word-level API";
-  const sentences =
-    s.sentenceLines > 0 ? `${s.sentenceLines} full-sentence line(s)` : "no full-sentence lines";
-  return `Last: ${s.segmentsAllCache} segment(s) fully cached; ${wordApi}; ${sentences}.`;
 }
 
 /**
@@ -717,14 +692,7 @@ function translateWholePage(options = {}) {
         if (activatingFirst) {
           pageTranslationEnabled = true;
         }
-        lastLoadSummaryText = formatLoadSummaryText({
-          segmentsAllCache: 0,
-          wordSegmentsApi: 0,
-          missingWords: 0,
-          sentenceLines: 0,
-          empty: true,
-        });
-        return { ok: true, wordCount: 0, empty: true, loadSummary: lastLoadSummaryText };
+        return { ok: true, wordCount: 0, empty: true };
       }
 
       let totalWords = 0;
@@ -1034,14 +1002,7 @@ function translateWholePage(options = {}) {
         await Promise.allSettled(pendingFullLines);
       }
 
-      lastLoadSummaryText = formatLoadSummaryText({
-        segmentsAllCache: segmentsAllCacheHits,
-        wordSegmentsApi: deferredWordApi.length,
-        missingWords: missingWordsTotal,
-        sentenceLines: pendingFullLineSchedulers.length,
-      });
-
-      return { ok: true, wordCount: totalWords, loadSummary: lastLoadSummaryText };
+      return { ok: true, wordCount: totalWords };
     } finally {
       translationInProgress = false;
       translationStatusPhase = "idle";
@@ -1080,10 +1041,10 @@ function showToast(message) {
       "box-shadow:0 12px 40px rgba(0,0,0,.45)",
       "pointer-events:none",
     ].join(";");
-    document.body.appendChild(el);
+    (document.body || document.documentElement).appendChild(el);
   }
   el.textContent = message;
-  el.hidden = false;
+  el.removeAttribute("hidden");
   clearTimeout(/** @type {any} */ (el)._vitHide);
   /** @type {any} */ (el)._vitHide = setTimeout(() => {
     el.hidden = true;
@@ -1119,7 +1080,7 @@ async function setPageTranslationEnabled(enabled) {
         translationStatusDetail = null;
         broadcastVitState();
         persistGlobalPageTranslation(true);
-        return { ok: true, enabled: true, already: true, loadSummary: lastLoadSummaryText };
+        return { ok: true, enabled: true, already: true };
       }
       const backendReady = await checkTranslationBackendConfigured();
       if (!backendReady.ok) {
@@ -1153,7 +1114,6 @@ async function setPageTranslationEnabled(enabled) {
         enabled: true,
         wordCount: r.wordCount,
         empty: r.empty,
-        loadSummary: r.loadSummary,
       };
     }
     restorePage();
@@ -1161,7 +1121,6 @@ async function setPageTranslationEnabled(enabled) {
     pageTranslationEnabled = false;
     translationStatusPhase = "idle";
     translationStatusDetail = null;
-    lastLoadSummaryText = null;
     broadcastVitState();
     return { ok: true, enabled: false };
   } catch (e) {
@@ -1189,6 +1148,11 @@ async function togglePageTranslation() {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "VIT_TOAST" && typeof msg.message === "string" && msg.message.trim()) {
+    showToast(msg.message.trim());
+    sendResponse({ ok: true });
+    return true;
+  }
   if (msg?.type === "GET_HTML_LANG") {
     const raw =
       document.documentElement.getAttribute("lang") || document.documentElement.lang || "";
@@ -1203,7 +1167,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       toggleOn: pageTranslationEnabled || translationInProgress,
       statusPhase: translationStatusPhase,
       statusDetail: translationStatusDetail,
-      lastLoadSummary: lastLoadSummaryText,
     });
     return true;
   }
@@ -1219,7 +1182,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "sync" || !changes.globalPageTranslation) return;
+  if (areaName !== "sync") return;
+  if (changes.syncPageTranslationAcrossTabs) {
+    syncPageTranslationAcrossTabs = changes.syncPageTranslationAcrossTabs.newValue === true;
+  }
+  if (!changes.globalPageTranslation) return;
+  if (!syncPageTranslationAcrossTabs) return;
   const nv = changes.globalPageTranslation.newValue === true;
   if (!nv) {
     if (pageTranslationEnabled) {
@@ -1227,7 +1195,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
       pageTranslationEnabled = false;
       translationStatusPhase = "idle";
       translationStatusDetail = null;
-      lastLoadSummaryText = null;
       broadcastVitState();
     }
     return;
@@ -1237,8 +1204,9 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 
-void chrome.storage.sync.get(["globalPageTranslation"], (s) => {
-  if (s?.globalPageTranslation !== true) return;
+void chrome.storage.sync.get(["syncPageTranslationAcrossTabs", "globalPageTranslation"], (s) => {
+  syncPageTranslationAcrossTabs = s?.syncPageTranslationAcrossTabs === true;
+  if (!syncPageTranslationAcrossTabs || s?.globalPageTranslation !== true) return;
   if (pageTranslationEnabled || translationInProgress) return;
   void setPageTranslationEnabled(true);
 });

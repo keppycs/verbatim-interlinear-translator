@@ -72,7 +72,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const toggleOn = !!(s.toggleOn ?? (enabled || loading));
     const statusPhase = typeof s.statusPhase === "string" ? s.statusPhase : "idle";
     const statusDetail = s.statusDetail != null ? String(s.statusDetail) : null;
-    const lastLoadSummary = s.lastLoadSummary != null ? String(s.lastLoadSummary) : null;
     if (chrome.storage.session) {
       void chrome.storage.session.set({
         [`vit_tab_${id}`]: {
@@ -81,7 +80,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           toggleOn,
           statusPhase,
           statusDetail,
-          lastLoadSummary,
           updatedAt: Date.now(),
         },
       });

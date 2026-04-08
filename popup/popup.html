@@ -3,41 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="color-scheme" content="dark" />
-    <title>Verbatim Interlinear</title>
+    <title>Verbatim Interlinear Translator</title>
     <link rel="stylesheet" href="../shared/theme.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body class="vit-ui vit-popup">
     <div class="shell">
       <div class="brand">
-        <img src="../logo.png" alt="" class="brand-mark" width="46" height="46" />
+        <img src="../logo.png" alt="" class="brand-mark" width="48" height="48" />
         <div class="brand-text">
-          <h1>Verbatim Interlinear</h1>
+          <h1>Verbatim Interlinear Translator</h1>
           <p>Word-by-word gloss on the page</p>
         </div>
       </div>
 
       <div class="card">
-        <div
-          class="row row--toggle"
-          title="Interlinear on: glosses on this tab; not necessarily cache-only."
-        >
-          <div class="row-label">
-            <strong>Interlinear mode</strong>
-            <span id="toggleSub">Off</span>
-          </div>
-          <div class="toggle-wrap">
-            <span id="toggleLoading" class="toggle-loading" role="status" aria-live="polite" hidden>
-              <span class="toggle-loading-spinner" aria-hidden="true"></span>
-              <span class="visually-hidden">Translating page</span>
-            </span>
-            <label class="switch" title="Toggle interlinear translation for this tab">
-              <input type="checkbox" id="pageToggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-
         <div class="lang-fields" role="group" aria-label="Translation languages">
           <label class="lang-field">
             <span class="lang-field-label">Source language</span>
@@ -108,19 +88,60 @@
         </div>
 
         <div class="row row--swap" role="group" aria-label="Swap languages">
-          <div class="swap-lang-pair">
-            <button
-              type="button"
-              class="btn-swap"
-              id="swapLang"
-              aria-label="Swap source and target languages"
-              title="Swap languages"
-              disabled
-            >
-              <span aria-hidden="true">⇄</span>
-            </button>
-            <span class="swap-lang-caption">Switch languages</span>
+          <button
+            type="button"
+            class="btn-swap"
+            id="swapLang"
+            aria-label="Swap source and target languages"
+            title="Swap source and target languages"
+            disabled
+          >
+            <span class="btn-swap-icon" aria-hidden="true">⇄</span>
+            <span>Switch languages</span>
+          </button>
+        </div>
+
+        <div
+          class="toggle-panel"
+          title="Interlinear on: glosses on this tab; not necessarily cache-only."
+        >
+          <div class="row row--toggle-line">
+            <strong class="toggle-line-title">Enable translator</strong>
+            <div class="toggle-wrap">
+              <span
+                id="toggleLoading"
+                class="toggle-loading"
+                role="status"
+                aria-live="polite"
+                hidden
+              >
+                <span class="toggle-loading-spinner" aria-hidden="true"></span>
+                <span class="visually-hidden">Translating page</span>
+              </span>
+              <label class="switch" title="Toggle interlinear translation for this tab">
+                <input type="checkbox" id="pageToggle" />
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
+          <div class="row row--toggle-line">
+            <span class="toggle-line-title">Enable on all tabs</span>
+            <label
+              class="switch"
+              title="When on, interlinear applies to every tab. When off, only this tab."
+            >
+              <input type="checkbox" id="syncPageTranslationAcrossTabs" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="row row--toggle-line" role="group" aria-label="Translation cache">
+            <span class="toggle-line-title">Use cache</span>
+            <label class="switch" title="Remember glosses locally between visits (when supported).">
+              <input type="checkbox" id="useTranslationCache" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <p class="toggle-panel-status" id="toggleSub">Status: Off</p>
         </div>
 
         <label class="lang-field lang-field--full">
@@ -135,27 +156,17 @@
           />
         </label>
 
-        <p id="languagesError" class="popup-error popup-error--inline" role="alert" hidden></p>
+        <p id="legacyCacheHint" class="cache-legacy-hint" role="note" hidden></p>
+        <p id="cacheStatus" class="cache-status" role="status" aria-live="polite" hidden></p>
 
-        <div class="row row--cache" role="group" aria-label="Translation cache">
-          <label class="row-cache-label">
-            <input type="checkbox" id="useTranslationCache" checked />
-            <span>Use cache</span>
-          </label>
+        <div class="row row--kbd-cache" role="group" aria-label="Keyboard shortcut and cache">
+          <p class="hint-kbd">
+            Shortcut: <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd>
+          </p>
           <button type="button" class="btn-clear-cache" id="clearTranslationCache">
             Clear cache
           </button>
         </div>
-        <p id="legacyCacheHint" class="cache-legacy-hint" role="note" hidden></p>
-        <p id="cacheStatus" class="cache-status" role="status" aria-live="polite" hidden></p>
-
-        <p id="statusLine" class="status-line" role="status" aria-live="polite" hidden></p>
-
-        <p id="idleHint" class="idle-hint" role="region" aria-label="Last run summary" hidden></p>
-
-        <p id="popupError" class="popup-error" role="alert" hidden></p>
-
-        <p class="hint-kbd">Shortcut: <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd></p>
       </div>
     </div>
     <script type="module" src="popup.js"></script>

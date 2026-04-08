@@ -10,7 +10,7 @@
     "128": "logo.png"
   },
   "minimum_chrome_version": "88",
-  "permissions": ["storage", "activeTab", "tabs", "contextMenus"],
+  "permissions": ["storage", "activeTab", "tabs", "contextMenus", "scripting"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background/service-worker.js",

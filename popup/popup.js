@@ -8,17 +8,19 @@ import { mountCustomSelect } from "./customSelect.js";
 const legacyMode = isLegacyCompat();
 
 const subEl = document.getElementById("toggleSub");
+
+/** Visible line under the toggles — always prefixed for clarity. */
+function statusMenuText(body) {
+  return `Status: ${body}`;
+}
 const toggleEl = document.getElementById("pageToggle");
 const loadingEl = document.getElementById("toggleLoading");
-const statusLineEl = document.getElementById("statusLine");
-const idleHintEl = document.getElementById("idleHint");
-const errorEl = document.getElementById("popupError");
 const sourceLangEl = document.getElementById("sourceLang");
 const targetLangEl = document.getElementById("targetLang");
 const baseUrlEl = document.getElementById("libreTranslateBaseUrl");
-const languagesErrorEl = document.getElementById("languagesError");
 const swapLangEl = document.getElementById("swapLang");
 const useCacheEl = document.getElementById("useTranslationCache");
+const syncPageTranslationAcrossTabsEl = document.getElementById("syncPageTranslationAcrossTabs");
 const clearCacheEl = document.getElementById("clearTranslationCache");
 const legacyCacheHintEl = document.getElementById("legacyCacheHint");
 const cacheStatusEl = document.getElementById("cacheStatus");
@@ -40,6 +42,9 @@ const NO_TARGET_MESSAGE = "Choose a target language before turning interlinear m
 /** Popup has no scrollbars; keep strings short so they fit clipped message areas. */
 const POPUP_TEXT_SOFT_CAP = 420;
 
+/** Page toast can show a bit more than inline popup text. */
+const TOAST_TEXT_MAX = 900;
+
 function truncatePopupText(s, max = POPUP_TEXT_SOFT_CAP) {
   const str = String(s);
   if (str.length <= max) return str;
@@ -54,26 +59,94 @@ let tabStatePollTimer = null;
 
 let baseUrlDebounceTimer = null;
 
-function setPopupError(text) {
-  if (!errorEl) return;
-  if (!text) {
-    errorEl.textContent = "";
-    errorEl.hidden = true;
+/**
+ * Injected when `tabs.sendMessage` fails (content script not ready / no receiver).
+ * Must be self-contained — serialized into the tab by `scripting.executeScript`.
+ * @param {string} toastText
+ */
+function injectVitToast(toastText) {
+  const id = "vit-lang-toast";
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement("div");
+    el.id = id;
+    el.setAttribute("role", "status");
+    el.style.cssText = [
+      "position:fixed",
+      "top:16px",
+      "left:50%",
+      "transform:translateX(-50%)",
+      "z-index:2147483646",
+      "max-width:min(92vw,420px)",
+      "padding:12px 16px",
+      "border-radius:12px",
+      "font:14px/1.45 system-ui,Segoe UI,sans-serif",
+      "color:#f4f0eb",
+      "background:#1c1916",
+      "border:1px solid rgba(255,153,51,0.35)",
+      "box-shadow:0 12px 40px rgba(0,0,0,.45)",
+      "pointer-events:none",
+    ].join(";");
+    (document.body || document.documentElement).appendChild(el);
+  }
+  el.textContent = toastText;
+  el.removeAttribute("hidden");
+  const prev = /** @type {any} */ (el)._vitHide;
+  if (prev) clearTimeout(prev);
+  /** @type {any} */ (el)._vitHide = setTimeout(() => {
+    el.hidden = true;
+  }, 4500);
+}
+
+/**
+ * Same visual as API errors on the page: fixed toast bar (see content `showToast`).
+ * Tries messaging the content script first; falls back to `scripting.executeScript` when
+ * the receiver is missing (common right after navigation or before `document_idle`).
+ */
+async function toastOnActiveTab(text) {
+  const msg = truncatePopupText(String(text || "").trim(), TOAST_TEXT_MAX);
+  if (!msg) return;
+  let tab;
+  try {
+    tab = await getActiveTab();
+  } catch (e) {
+    console.warn("[Verbatim] toast:", e);
     return;
   }
-  errorEl.textContent = truncatePopupText(text);
-  errorEl.hidden = false;
+  if (!tab?.id || isRestrictedUrl(tab.url || "")) return;
+
+  const delivered = await new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(tab.id, { type: "VIT_TOAST", message: msg }, () => {
+        if (chrome.runtime.lastError) resolve(false);
+        else resolve(true);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+
+  if (delivered) return;
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: injectVitToast,
+      args: [msg],
+    });
+  } catch (e) {
+    console.warn("[Verbatim] toast inject failed:", e);
+  }
+}
+
+function setPopupError(text) {
+  if (!text) return;
+  void toastOnActiveTab(text);
 }
 
 function setLanguagesError(text) {
-  if (!languagesErrorEl) return;
-  if (!text) {
-    languagesErrorEl.textContent = "";
-    languagesErrorEl.hidden = true;
-    return;
-  }
-  languagesErrorEl.textContent = truncatePopupText(text);
-  languagesErrorEl.hidden = false;
+  if (!text) return;
+  void toastOnActiveTab(text);
 }
 
 function applyLegacyCacheUi() {
@@ -116,7 +189,7 @@ function formatToggleError(res) {
 
 function setSubtext(enabled) {
   if (subEl) {
-    subEl.textContent = enabled ? "Interlinear on" : "Off";
+    subEl.textContent = statusMenuText(enabled ? "Interlinear on" : "Off");
   }
   if (toggleEl) toggleEl.checked = !!enabled;
 }
@@ -392,28 +465,6 @@ async function refreshLanguagesUi() {
 }
 
 /**
- * When interlinear is on and not loading: show last-run stats when available.
- * @param {boolean} on
- * @param {boolean} loading
- * @param {string} [lastSummary]
- */
-function updateIdleHintForSnap(on, loading, lastSummary) {
-  if (!idleHintEl) return;
-  if (!on || loading) {
-    idleHintEl.hidden = true;
-    return;
-  }
-  const trimmed = typeof lastSummary === "string" ? lastSummary.trim() : "";
-  if (!trimmed) {
-    idleHintEl.textContent = "";
-    idleHintEl.hidden = true;
-    return;
-  }
-  idleHintEl.hidden = false;
-  idleHintEl.textContent = truncatePopupText(trimmed, 320);
-}
-
-/**
  * @param {string} [phase]
  */
 function formatStatusSub(phase) {
@@ -426,26 +477,6 @@ function formatStatusSub(phase) {
       return "Translating sentences...";
     default:
       return "Working…";
-  }
-}
-
-/**
- * @param {string} [phase]
- * @param {string | null} [detail]
- */
-function formatStatusLine(phase, detail) {
-  if (detail && String(detail).trim()) {
-    return String(detail).trim();
-  }
-  switch (phase) {
-    case "cache":
-      return "Loading cached glosses and layout (no network yet).";
-    case "api_words":
-      return "Requesting missing word glosses from LibreTranslate.";
-    case "api_sentences":
-      return "Full-sentence lines: cache first, then API.";
-    default:
-      return "";
   }
 }
 
@@ -489,17 +520,8 @@ function setLoading(loading, phase = "idle", detail = null) {
   if (useCacheEl) useCacheEl.disabled = !!loading || legacyMode;
   if (clearCacheEl) clearCacheEl.disabled = !!loading || legacyMode;
   const effectivePhase = loading && (!phase || phase === "idle") ? "cache" : phase || "idle";
-  if (statusLineEl) {
-    if (loading) {
-      statusLineEl.textContent = truncatePopupText(formatStatusLine(effectivePhase, detail), 300);
-      statusLineEl.hidden = false;
-    } else {
-      statusLineEl.textContent = "";
-      statusLineEl.hidden = true;
-    }
-  }
   if (loading && subEl) {
-    subEl.textContent = formatStatusSub(effectivePhase);
+    subEl.textContent = statusMenuText(formatStatusSub(effectivePhase));
   }
   if (loading) {
     startTabStatePoll();
@@ -525,8 +547,8 @@ async function getActiveTab() {
 }
 
 async function getGlobalPageTranslationOn() {
-  const o = await chrome.storage.sync.get(["globalPageTranslation"]);
-  return o?.globalPageTranslation === true;
+  const o = await chrome.storage.sync.get(["syncPageTranslationAcrossTabs", "globalPageTranslation"]);
+  return o?.syncPageTranslationAcrossTabs === true && o?.globalPageTranslation === true;
 }
 
 function saveLanguagesPartial(patch) {
@@ -559,7 +581,6 @@ function applyTabStateSnapshot(snap, globalOn = false) {
   const on = globalOn || !!(snap.toggleOn ?? snap.enabled ?? loading);
   const phase = typeof snap.statusPhase === "string" ? snap.statusPhase : "idle";
   const detail = snap.statusDetail != null ? String(snap.statusDetail) : null;
-  const lastSummary = snap.lastLoadSummary != null ? String(snap.lastLoadSummary) : "";
   if (loading) {
     setLoading(true, phase, detail);
   } else {
@@ -568,9 +589,8 @@ function applyTabStateSnapshot(snap, globalOn = false) {
   }
   if (toggleEl) toggleEl.checked = on;
   if (subEl && !loading) {
-    subEl.textContent = on ? "Interlinear on" : "Off";
+    subEl.textContent = statusMenuText(on ? "Interlinear on" : "Off");
   }
-  updateIdleHintForSnap(on, loading, lastSummary);
 }
 
 async function applySessionSnapshotForTab(tabId, globalOn) {
@@ -599,7 +619,6 @@ function syncToggleFromTab() {
           toggleEl.checked = globalOn;
           toggleEl.disabled = true;
         }
-        if (idleHintEl) idleHintEl.hidden = true;
         resolve();
         return;
       }
@@ -626,13 +645,10 @@ function applyToggleResponse(wantOn, res) {
   if (res?.ok === true) {
     setPopupError("");
     setSubtext(!!res.enabled);
-    const ls = typeof res.loadSummary === "string" ? res.loadSummary : "";
-    updateIdleHintForSnap(!!res.enabled, false, ls);
     return;
   }
   toggleEl.checked = !wantOn;
   setSubtext(!wantOn);
-  updateIdleHintForSnap(!wantOn, false, "");
   setPopupError(formatToggleError(res));
 }
 
@@ -644,6 +660,9 @@ async function loadSettingsIntoForm() {
   }
   if (useCacheEl) {
     useCacheEl.checked = legacyMode ? false : merged.useTranslationCache !== false;
+  }
+  if (syncPageTranslationAcrossTabsEl) {
+    syncPageTranslationAcrossTabsEl.checked = merged.syncPageTranslationAcrossTabs === true;
   }
   applyLegacyCacheUi();
   await refreshLanguagesUi();
@@ -672,14 +691,14 @@ clearCacheEl?.addEventListener("click", () => {
   setCacheStatus("");
   chrome.runtime.sendMessage({ type: "CLEAR_TRANSLATION_CACHE" }, (res) => {
     if (chrome.runtime.lastError) {
-      setCacheStatus("Could not clear cache.");
+      void toastOnActiveTab(chrome.runtime.lastError.message || "Could not clear cache.");
       return;
     }
     if (res?.ok) {
       setCacheStatus("Translation cache cleared.");
       setTimeout(() => setCacheStatus(""), 2500);
     } else {
-      setCacheStatus(res?.error || "Could not clear cache.");
+      void toastOnActiveTab(res?.error || "Could not clear cache.");
     }
   });
 });
@@ -743,7 +762,7 @@ if (chrome.storage.session?.onChanged) {
 }
 
 chrome.storage.sync.onChanged.addListener((changes) => {
-  if (!changes.globalPageTranslation) return;
+  if (!changes.globalPageTranslation && !changes.syncPageTranslationAcrossTabs) return;
   void (async () => {
     const globalOn = await getGlobalPageTranslationOn();
     const tab = await getActiveTab();
@@ -756,6 +775,35 @@ chrome.storage.sync.onChanged.addListener((changes) => {
       if (chrome.runtime.lastError) return;
       applyTabStateSnapshot(res, globalOn);
     });
+  })();
+});
+
+syncPageTranslationAcrossTabsEl?.addEventListener("change", () => {
+  const on = !!syncPageTranslationAcrossTabsEl.checked;
+  void (async () => {
+    if (!on) {
+      await saveLanguagesPartial({ syncPageTranslationAcrossTabs: false, globalPageTranslation: false });
+      await syncToggleFromTab();
+      return;
+    }
+    const tab = await getActiveTab();
+    let interlinearOn = false;
+    if (tab?.id && !isRestrictedUrl(tab.url || "")) {
+      interlinearOn = await new Promise((resolve) => {
+        chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
+          if (chrome.runtime.lastError) {
+            resolve(false);
+            return;
+          }
+          resolve(!!(res?.toggleOn ?? res?.enabled));
+        });
+      });
+    }
+    await saveLanguagesPartial({
+      syncPageTranslationAcrossTabs: true,
+      globalPageTranslation: interlinearOn,
+    });
+    await syncToggleFromTab();
   })();
 });
 
@@ -783,7 +831,10 @@ toggleEl?.addEventListener("change", async () => {
   };
 
   if (!wantOn) {
-    await saveLanguagesPartial({ globalPageTranslation: false });
+    const syncSnap = await chrome.storage.sync.get(["syncPageTranslationAcrossTabs"]);
+    if (syncSnap?.syncPageTranslationAcrossTabs === true) {
+      await saveLanguagesPartial({ globalPageTranslation: false });
+    }
     sendSetPage();
     return;
   }
