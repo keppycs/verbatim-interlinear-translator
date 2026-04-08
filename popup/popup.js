@@ -1,5 +1,5 @@
 import { defaultSettings } from "../lib/defaultSettings.js";
-import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
+import { stripLibreTranslateHostForStorage } from "../lib/translation/normalizeServiceUrl.js";
 import { toLibreStyleLang } from "../lib/translation/libreStyleLang.js";
 import { isLegacyCompat } from "../lib/compat.js";
 import { ensureVitContentScript } from "../lib/ensureVitContentScript.js";
@@ -877,7 +877,7 @@ async function loadSettingsIntoForm() {
   const stored = await chrome.storage.sync.get(null);
   const merged = { ...defaultSettings, ...stored };
   if (baseUrlEl) {
-    baseUrlEl.value = merged.libreTranslateBaseUrl || "";
+    baseUrlEl.value = stripLibreTranslateHostForStorage(merged.libreTranslateBaseUrl || "");
   }
   if (useCacheEl) {
     useCacheEl.checked = legacyMode ? false : merged.useTranslationCache !== false;
@@ -892,13 +892,13 @@ async function loadSettingsIntoForm() {
 baseUrlEl?.addEventListener("input", () => {
   clearTimeout(baseUrlDebounceTimer);
   baseUrlDebounceTimer = setTimeout(() => {
-    const v = normalizeHttpServiceBaseUrl(baseUrlEl.value.trim());
+    const v = stripLibreTranslateHostForStorage(baseUrlEl.value);
     chrome.storage.sync.set({ libreTranslateBaseUrl: v }, () => void refreshLanguagesUi());
   }, 400);
 });
 
 baseUrlEl?.addEventListener("blur", () => {
-  const v = normalizeHttpServiceBaseUrl(baseUrlEl.value.trim());
+  const v = stripLibreTranslateHostForStorage(baseUrlEl.value);
   baseUrlEl.value = v;
   chrome.storage.sync.set({ libreTranslateBaseUrl: v }, () => void refreshLanguagesUi());
 });
