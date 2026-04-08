@@ -1,4 +1,27 @@
 /**
+ * Mirrors `lib/translation/libreStyleLang.js` — content scripts stay non-module for broad browser support.
+ * @param {string} code
+ * @returns {string}
+ */
+function toLibreStyleLang(code) {
+  if (!code || code === "auto") return "auto";
+  const i = code.indexOf("-");
+  return i === -1 ? code : code.slice(0, i);
+}
+
+/**
+ * Lowercase primary subtag for comparing source vs target (e.g. en-US and en → same).
+ * @param {string} code
+ * @returns {string}
+ */
+function primarySubtagForCompare(code) {
+  if (typeof code !== "string") return "";
+  const t = code.trim();
+  if (!t) return "";
+  return toLibreStyleLang(t).toLowerCase();
+}
+
+/**
  * Space-separated tokenization only (no CJK/Thai segmenter yet).
  * @param {string} text
  * @returns {string[]}
@@ -244,14 +267,18 @@ let pageTranslationEnabled = false;
 /** True while translateWholePage is running (initial or incremental). */
 let translationInProgress = false;
 
-/** Shown in the toolbar popup while loading: cache scan vs API phases. */
-/** @type {"idle" | "cache" | "api_words" | "api_sentences"} */
+/**
+ * Cache vs API phase — mirrored to the toolbar popup while loading.
+ * @type {"idle" | "cache" | "api_words" | "api_sentences"}
+ */
 let translationStatusPhase = "idle";
 /** @type {string | null} */
 let translationStatusDetail = null;
 
-/** One-line summary of the last successful translate run (for the popup). */
-/** @type {string | null} */
+/**
+ * Last successful run summary for the popup (one line).
+ * @type {string | null}
+ */
 let lastLoadSummaryText = null;
 
 /** Coalesce concurrent translateWholePage calls into one in-flight run. */
@@ -281,18 +308,6 @@ function primaryLangFromHtmlLang(raw) {
   const base = t.split(/[-_]/)[0];
   if (!/^[A-Za-z]{2,3}$/.test(base)) return "";
   return base.toLowerCase();
-}
-
-/**
- * LibreTranslate-style primary subtag for comparing source vs target.
- * @param {string} code
- */
-function librePrimarySubtag(code) {
-  if (typeof code !== "string") return "";
-  const t = code.trim();
-  if (!t) return "";
-  const i = t.indexOf("-");
-  return (i === -1 ? t : t.slice(0, i)).toLowerCase();
 }
 
 /**
@@ -678,7 +693,7 @@ function translateWholePage(options = {}) {
         };
       }
       const sourceLang = resolvedSource.sourceLang;
-      if (librePrimarySubtag(sourceLang) === librePrimarySubtag(targetLang)) {
+      if (primarySubtagForCompare(sourceLang) === primarySubtagForCompare(targetLang)) {
         return {
           ok: false,
           error: "source_same_as_target",
@@ -751,9 +766,12 @@ function translateWholePage(options = {}) {
       /** @type {Promise<void>[]} */
       const wordApiPromises = [];
 
+      /** Segments where every word gloss was already in the extension cache. */
+      let segmentsAllCacheHits = 0;
+      /** Word-level API calls only — for end-of-run stats. */
+      let missingWordsTotal = 0;
+
       let apiErrorToastShown = false;
-      /** First successful word-level API response reports which backend responded. */
-      let wordApiBackendReported = false;
       function showApiErrorOnce(message) {
         if (apiErrorToastShown) return;
         apiErrorToastShown = true;
@@ -764,19 +782,27 @@ function translateWholePage(options = {}) {
         showToast(m);
       }
 
-      function noteWordApiBackend(backend) {
-        if (wordApiBackendReported || !backend) return;
-        const name = friendlyBackendName(backend);
-        if (!name) return;
-        wordApiBackendReported = true;
-        setTranslationStatus("api_words", `Translation API (${name}): missing word glosses`);
-      }
-
-      let firstWordApiNotified = false;
-      function noteFirstWordApi() {
-        if (firstWordApiNotified) return;
-        firstWordApiNotified = true;
-        setTranslationStatus("api_words", "Translation API — missing word glosses (LibreTranslate).");
+      /** Shown once until a friendly backend id arrives (concurrent segment jobs). */
+      let firstWordApiStatusSent = false;
+      let wordApiBackendReported = false;
+      /**
+       * Pending: generic status. After first response with a displayable backend: specific line (once).
+       * @param {string} [backend]
+       */
+      function setWordApiStatusDetail(backend) {
+        const name = backend ? friendlyBackendName(backend) : null;
+        if (backend && !name) return;
+        if (name) {
+          if (!wordApiBackendReported) {
+            wordApiBackendReported = true;
+            setTranslationStatus("api_words", `Translation API (${name}): missing word glosses`);
+          }
+          return;
+        }
+        if (!firstWordApiStatusSent) {
+          firstWordApiStatusSent = true;
+          setTranslationStatus("api_words", "Translation API — missing word glosses (LibreTranslate).");
+        }
       }
 
       /**
@@ -786,7 +812,7 @@ function translateWholePage(options = {}) {
       async function processDeferredWordJob(job) {
         if (abortWholePass) return;
         if (job.kind === "all_miss") {
-          noteFirstWordApi();
+          setWordApiStatusDetail();
           const tr = await sendTranslateWordsInChunks(job.words, sourceLang, targetLang);
           if (abortWholePass) return;
           if (tr.error) {
@@ -799,7 +825,7 @@ function translateWholePage(options = {}) {
             await yieldToMain();
             return;
           }
-          noteWordApiBackend(tr.backend);
+          setWordApiStatusDetail(tr.backend);
           try {
             if (job.wrap && job.groups) {
               updateGlossesInWrap(job.wrap, tr.translations);
@@ -813,7 +839,7 @@ function translateWholePage(options = {}) {
           return;
         }
 
-        noteFirstWordApi();
+        setWordApiStatusDetail();
         const missing = job.missingIdx.map((i) => job.words[i]);
         /** @type {string[]} */
         const apiFlat = [];
@@ -832,7 +858,7 @@ function translateWholePage(options = {}) {
             chunkFailed = true;
             break;
           }
-          noteWordApiBackend(tr.backend);
+          setWordApiStatusDetail(tr.backend);
           apiFlat.push(...tr.translations);
         }
         if (chunkFailed) {
@@ -862,15 +888,13 @@ function translateWholePage(options = {}) {
 
       function enqueueWordApi(job) {
         deferredWordApi.push(job);
+        missingWordsTotal += job.kind === "all_miss" ? job.words.length : job.missingIdx.length;
         wordApiPromises.push(
           processDeferredWordJob(job).catch((e) => {
             console.warn("[Verbatim]", e);
           })
         );
       }
-
-      /** Segments where every word gloss was already in the extension cache. */
-      let segmentsAllCacheHits = 0;
 
       /* —— Phase 1: cache only (mount UI; defer API) —— */
       for (const seg of segments) {
@@ -996,12 +1020,6 @@ function translateWholePage(options = {}) {
       for (const fn of pendingFullLineSchedulers) fn();
       if (pendingFullLines.length) {
         await Promise.allSettled(pendingFullLines);
-      }
-
-      let missingWordsTotal = 0;
-      for (const job of deferredWordApi) {
-        if (job.kind === "all_miss") missingWordsTotal += job.words.length;
-        else missingWordsTotal += job.missingIdx.length;
       }
 
       lastLoadSummaryText = formatLoadSummaryText({
@@ -1159,15 +1177,6 @@ async function togglePageTranslation() {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === "TOKENIZE_WORDS") {
-    const t = msg.text ?? "";
-    if (shouldSkipForSegmenter(t)) {
-      sendResponse({ words: [], skipped: "needs_segmenter" });
-      return true;
-    }
-    sendResponse({ words: splitWordsWhitespaceOnly(t), skipped: null });
-    return true;
-  }
   if (msg?.type === "GET_HTML_LANG") {
     const raw = document.documentElement.getAttribute("lang") || document.documentElement.lang || "";
     sendResponse({ raw, primary: primaryLangFromHtmlLang(raw) });

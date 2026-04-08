@@ -1,16 +1,16 @@
-import {
-  translateWithCache,
-  probeCacheOnly,
-  translateWithoutCache,
-  clearTranslationCache,
-} from "../lib/translation/cache.js";
+import { translateWithCache, probeCacheOnly, clearTranslationCache } from "../lib/translation/cache.js";
 import { hasConfiguredTranslationBackend } from "../lib/translation/resolve.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
 import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
 import { fetchLibreLanguages } from "../lib/translation/fetchLibreLanguages.js";
+import { isLegacyCompat } from "../lib/compat.js";
 
 function mergeSettings(stored) {
-  return { ...defaultSettings, ...stored };
+  const m = { ...defaultSettings, ...stored };
+  if (isLegacyCompat()) {
+    m.useTranslationCache = false;
+  }
+  return m;
 }
 
 /** @type {{ key: string, languages: unknown[] | null }} */
@@ -73,17 +73,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const statusPhase = typeof s.statusPhase === "string" ? s.statusPhase : "idle";
     const statusDetail = s.statusDetail != null ? String(s.statusDetail) : null;
     const lastLoadSummary = s.lastLoadSummary != null ? String(s.lastLoadSummary) : null;
-    void chrome.storage.session.set({
-      [`vit_tab_${id}`]: {
-        enabled,
-        loading,
-        toggleOn,
-        statusPhase,
-        statusDetail,
-        lastLoadSummary,
-        updatedAt: Date.now(),
-      },
-    });
+    if (chrome.storage.session) {
+      void chrome.storage.session.set({
+        [`vit_tab_${id}`]: {
+          enabled,
+          loading,
+          toggleOn,
+          statusPhase,
+          statusDetail,
+          lastLoadSummary,
+          updatedAt: Date.now(),
+        },
+      });
+    }
     return;
   }
 
@@ -159,24 +161,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } catch {
         sendResponse({ ok: false });
       }
-    })();
-    return true;
-  }
-  if (msg?.type === "TRANSLATE_NO_CACHE") {
-    (async () => {
-      const stored = await chrome.storage.sync.get(null);
-      const settings = mergeSettings(stored);
-      const sourceLang = msg.sourceLang ?? settings.sourceLang;
-      const targetLang = String(msg.targetLang ?? settings.targetLang ?? "").trim();
-      if (!targetLang) {
-        sendResponse({
-          error: "no_target_language",
-          message: "Choose a target language in the extension toolbar menu.",
-        });
-        return;
-      }
-      const result = await translateWithoutCache(settings, msg.texts || [], sourceLang, targetLang);
-      sendResponse(result);
     })();
     return true;
   }

@@ -45,7 +45,6 @@
 }
 
 /* Full sentence: same size as gloss row; no width:100% (that pulls the block to the paragraph width) */
-[data-vit-root] .vit-full-line[data-vit-full],
 [data-vit-root] .vit-full-line {
   display: block !important;
   box-sizing: border-box !important;

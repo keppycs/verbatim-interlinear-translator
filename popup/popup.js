@@ -1,6 +1,10 @@
 import { defaultSettings } from "../lib/defaultSettings.js";
 import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
 import { toLibreStyleLang } from "../lib/translation/libreStyleLang.js";
+import { isLegacyCompat } from "../lib/compat.js";
+
+/** Browsers without `chrome.storage.session` — translation cache is forced off in the service worker. */
+const legacyMode = isLegacyCompat();
 
 const subEl = document.getElementById("toggleSub");
 const toggleEl = document.getElementById("pageToggle");
@@ -15,6 +19,7 @@ const languagesErrorEl = document.getElementById("languagesError");
 const swapLangEl = document.getElementById("swapLang");
 const useCacheEl = document.getElementById("useTranslationCache");
 const clearCacheEl = document.getElementById("clearTranslationCache");
+const legacyCacheHintEl = document.getElementById("legacyCacheHint");
 const cacheStatusEl = document.getElementById("cacheStatus");
 
 const NO_BACKEND_MESSAGE = "Set your LibreTranslate URL above.";
@@ -49,6 +54,18 @@ function setLanguagesError(text) {
   }
   languagesErrorEl.textContent = text;
   languagesErrorEl.hidden = false;
+}
+
+function applyLegacyCacheUi() {
+  if (!legacyCacheHintEl) return;
+  if (legacyMode) {
+    legacyCacheHintEl.textContent =
+      "Translation cache is unavailable on this browser version. Glosses are not saved locally between visits.";
+    legacyCacheHintEl.hidden = false;
+  } else {
+    legacyCacheHintEl.textContent = "";
+    legacyCacheHintEl.hidden = true;
+  }
 }
 
 function setCacheStatus(text) {
@@ -246,8 +263,9 @@ async function rebuildTargetSelect(languages, sourceValue, preferredTarget, html
   } else {
     codes = targetCodesForConcreteSource(languages, src);
   }
+  const labelByCode = new Map(codes.map((c) => [c, displayNameForCode(languages, c)]));
   codes.sort((a, b) =>
-    displayNameForCode(languages, a).localeCompare(displayNameForCode(languages, b), undefined, {
+    (labelByCode.get(a) || "").localeCompare(labelByCode.get(b) || "", undefined, {
       sensitivity: "base",
     }),
   );
@@ -375,9 +393,9 @@ function formatStatusSub(phase) {
     case "cache":
       return "Loading from cache…";
     case "api_words":
-      return "Translating words";
+      return "Translating words...";
     case "api_sentences":
-      return "Translating sentences";
+      return "Translating sentences...";
     default:
       return "Working…";
   }
@@ -440,8 +458,8 @@ function setLoading(loading, phase = "idle", detail = null) {
   if (targetLangEl) targetLangEl.disabled = !!loading || !lastLanguages;
   if (baseUrlEl) baseUrlEl.disabled = !!loading;
   if (swapLangEl) swapLangEl.disabled = !!loading || !lastLanguages;
-  if (useCacheEl) useCacheEl.disabled = !!loading;
-  if (clearCacheEl) clearCacheEl.disabled = !!loading;
+  if (useCacheEl) useCacheEl.disabled = !!loading || legacyMode;
+  if (clearCacheEl) clearCacheEl.disabled = !!loading || legacyMode;
   const effectivePhase = loading && (!phase || phase === "idle") ? "cache" : phase || "idle";
   if (statusLineEl) {
     if (loading) {
@@ -528,6 +546,7 @@ function applyTabStateSnapshot(snap, globalOn = false) {
 
 async function applySessionSnapshotForTab(tabId, globalOn) {
   if (tabId == null) return;
+  if (!chrome.storage.session) return;
   try {
     const key = `vit_tab_${tabId}`;
     const obj = await chrome.storage.session.get(key);
@@ -595,8 +614,9 @@ async function loadSettingsIntoForm() {
     baseUrlEl.value = merged.libreTranslateBaseUrl || "";
   }
   if (useCacheEl) {
-    useCacheEl.checked = merged.useTranslationCache !== false;
+    useCacheEl.checked = legacyMode ? false : merged.useTranslationCache !== false;
   }
+  applyLegacyCacheUi();
   await refreshLanguagesUi();
 }
 
@@ -615,6 +635,7 @@ baseUrlEl?.addEventListener("blur", () => {
 });
 
 useCacheEl?.addEventListener("change", () => {
+  if (legacyMode) return;
   chrome.storage.sync.set({ useTranslationCache: !!useCacheEl.checked });
 });
 
@@ -677,18 +698,20 @@ void (async () => {
   await syncToggleFromTab();
 })();
 
-chrome.storage.session.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "session") return;
-  void (async () => {
-    const tab = await getActiveTab();
-    if (!tab?.id) return;
-    const key = `vit_tab_${tab.id}`;
-    const ch = changes[key];
-    if (!ch?.newValue) return;
-    const globalOn = await getGlobalPageTranslationOn();
-    applyTabStateSnapshot(ch.newValue, globalOn);
-  })();
-});
+if (chrome.storage.session?.onChanged) {
+  chrome.storage.session.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "session") return;
+    void (async () => {
+      const tab = await getActiveTab();
+      if (!tab?.id) return;
+      const key = `vit_tab_${tab.id}`;
+      const ch = changes[key];
+      if (!ch?.newValue) return;
+      const globalOn = await getGlobalPageTranslationOn();
+      applyTabStateSnapshot(ch.newValue, globalOn);
+    })();
+  });
+}
 
 chrome.storage.sync.onChanged.addListener((changes) => {
   if (!changes.globalPageTranslation) return;

@@ -3,6 +3,7 @@
   "name": "Verbatim Interlinear Translator",
   "version": "0.4.0",
   "description": "Word-by-word interlinear translation injected into page HTML.",
+  "minimum_chrome_version": "88",
   "permissions": ["storage", "activeTab", "tabs", "contextMenus"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {

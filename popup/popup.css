@@ -198,6 +198,17 @@ body.vit-ui.vit-popup {
   border-color: rgba(255, 153, 51, 0.5);
 }
 
+.cache-legacy-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--vit-muted);
+}
+
+.cache-legacy-hint[hidden] {
+  display: none !important;
+}
+
 .cache-status {
   margin: 0 0 12px;
   font-size: 12px;
@@ -427,47 +438,6 @@ body.vit-ui.vit-popup .lang-select option {
   transform: translateY(-50%) scale(0.94);
 }
 
-.footer {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid var(--vit-border-accent);
-}
-
-.link-options {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 12px 14px;
-  font-size: 15px;
-  font-weight: 650;
-  color: var(--vit-accent);
-  text-decoration: none;
-  border-radius: var(--vit-radius);
-  background: transparent;
-  border: 1px solid transparent;
-  transition:
-    background var(--vit-duration) var(--vit-ease),
-    border-color var(--vit-duration) var(--vit-ease),
-    color var(--vit-duration) var(--vit-ease),
-    transform var(--vit-duration) var(--vit-ease);
-}
-
-.link-options:hover {
-  background: rgba(255, 153, 51, 0.12);
-  border-color: rgba(255, 153, 51, 0.35);
-  color: var(--vit-accent-hover);
-}
-
-.link-options:active {
-  transform: scale(0.98);
-}
-
-.link-options:focus-visible {
-  outline: 2px solid var(--vit-ring);
-  outline-offset: 3px;
-}
-
 .hint-kbd {
   margin-top: 16px;
   font-size: 13px;
@@ -491,8 +461,7 @@ body.vit-ui.vit-popup .lang-select option {
   .slider,
   .slider::before,
   .brand-mark,
-  .card,
-  .link-options {
+  .card {
     transition-duration: 0.01ms !important;
   }
 
