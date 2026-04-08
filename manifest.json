@@ -3,6 +3,12 @@
   "name": "Verbatim Interlinear Translator",
   "version": "0.4.0",
   "description": "Word-by-word interlinear translation injected into page HTML.",
+  "icons": {
+    "16": "logo.png",
+    "32": "logo.png",
+    "48": "logo.png",
+    "128": "logo.png"
+  },
   "minimum_chrome_version": "88",
   "permissions": ["storage", "activeTab", "tabs", "contextMenus"],
   "host_permissions": ["http://*/*", "https://*/*"],
@@ -12,7 +18,11 @@
   },
   "action": {
     "default_title": "Verbatim Interlinear — toggle whole-page translation",
-    "default_popup": "popup/popup.html"
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "logo.png",
+      "32": "logo.png"
+    }
   },
   "commands": {
     "toggle-page-translation": {
