@@ -2,6 +2,7 @@ import { defaultSettings } from "../lib/defaultSettings.js";
 import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
 import { toLibreStyleLang } from "../lib/translation/libreStyleLang.js";
 import { isLegacyCompat } from "../lib/compat.js";
+import { mountCustomSelect } from "./customSelect.js";
 
 /** Browsers without `chrome.storage.session` — translation cache is forced off in the service worker. */
 const legacyMode = isLegacyCompat();
@@ -23,6 +24,16 @@ const legacyCacheHintEl = document.getElementById("legacyCacheHint");
 const cacheStatusEl = document.getElementById("cacheStatus");
 
 const NO_BACKEND_MESSAGE = "Set your LibreTranslate URL above.";
+
+let resyncSourceSelectUi = () => {};
+let resyncTargetSelectUi = () => {};
+if (sourceLangEl) resyncSourceSelectUi = mountCustomSelect(sourceLangEl);
+if (targetLangEl) resyncTargetSelectUi = mountCustomSelect(targetLangEl);
+
+function resyncLanguageSelectUis() {
+  resyncSourceSelectUi();
+  resyncTargetSelectUi();
+}
 
 const NO_TARGET_MESSAGE = "Choose a target language before turning interlinear mode on.";
 
@@ -205,11 +216,13 @@ function rebuildSourceSelect(languages) {
     opt.textContent = row.name || row.code;
     sourceLangEl.appendChild(opt);
   }
+  resyncSourceSelectUi();
 }
 
 function setAutoSourceOptionLabel(text) {
   const opt = sourceLangEl?.querySelector('option[value="auto"]');
   if (opt) opt.textContent = text;
+  resyncSourceSelectUi();
 }
 
 /**
@@ -290,6 +303,7 @@ async function rebuildTargetSelect(languages, sourceValue, preferredTarget, html
   } else {
     targetLangEl.value = "";
   }
+  resyncTargetSelectUi();
 }
 
 /**
@@ -309,6 +323,7 @@ function applyLanguageValuesFromStorage(opts = {}) {
       const optionValues = [...sourceLangEl.options].map((o) => o.value);
       const src = pickSourceLangValue(optionValues, preferSource, fromStorage);
       sourceLangEl.value = src;
+      resyncSourceSelectUi();
       const preferredTarget = preferTarget || rawTarget;
       void (async () => {
         const primaryHint = await getHtmlLangPrimaryForActiveTab();
@@ -342,6 +357,7 @@ async function refreshLanguagesUi() {
     }
     if (swapLangEl) swapLangEl.disabled = true;
     setLanguagesError("");
+    resyncLanguageSelectUis();
     return;
   }
   setLanguagesError("");
@@ -358,6 +374,7 @@ async function refreshLanguagesUi() {
     if (sourceLangEl) sourceLangEl.disabled = false;
     if (targetLangEl) targetLangEl.disabled = false;
     if (swapLangEl) swapLangEl.disabled = false;
+    resyncLanguageSelectUis();
   } catch (e) {
     lastLanguages = null;
     if (sourceLangEl) {
@@ -370,6 +387,7 @@ async function refreshLanguagesUi() {
     }
     if (swapLangEl) swapLangEl.disabled = true;
     setLanguagesError(e?.message || String(e));
+    resyncLanguageSelectUis();
   }
 }
 
@@ -488,6 +506,7 @@ function setLoading(loading, phase = "idle", detail = null) {
   } else {
     stopTabStatePoll();
   }
+  resyncLanguageSelectUis();
 }
 
 function isRestrictedUrl(url) {

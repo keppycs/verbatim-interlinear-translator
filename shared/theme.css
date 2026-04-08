@@ -161,13 +161,13 @@ select option {
   font-size: 0.9375rem;
   padding: 0.55rem 0.75rem;
   margin: 2px 4px;
-  background-color: #1e1c19;
+  background-color: #1f1c19;
   color: var(--vit-text);
   border-radius: var(--vit-radius-sm);
 }
 
 select option:hover {
-  background: rgba(255, 153, 51, 0.2);
+  background: rgba(255, 153, 51, 0.22);
 }
 
 select option:checked,

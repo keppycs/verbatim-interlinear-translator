@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark" />
     <title>Verbatim Interlinear</title>
     <link rel="stylesheet" href="../shared/theme.css" />
     <link rel="stylesheet" href="popup.css" />
@@ -9,7 +10,7 @@
   <body class="vit-ui vit-popup">
     <div class="shell">
       <div class="brand">
-        <img src="../logo.png" alt="" class="brand-mark" width="40" height="40" />
+        <img src="../logo.png" alt="" class="brand-mark" width="46" height="46" />
         <div class="brand-text">
           <h1>Verbatim Interlinear</h1>
           <p>Word-by-word gloss on the page</p>
@@ -40,21 +41,69 @@
         <div class="lang-fields" role="group" aria-label="Translation languages">
           <label class="lang-field">
             <span class="lang-field-label">Source language</span>
-            <select
-              id="sourceLang"
-              class="lang-select"
-              title="Language of the page text"
-              disabled
-            ></select>
+            <div class="custom-select">
+              <button
+                type="button"
+                class="custom-select-trigger"
+                id="sourceLangFace"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="sourceLangListbox"
+                disabled
+              >
+                <span class="custom-select-value">—</span>
+                <span class="custom-select-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="custom-select-dropdown" id="sourceLangDropdown" hidden>
+                <ul
+                  class="custom-select-options"
+                  id="sourceLangListbox"
+                  role="listbox"
+                  aria-labelledby="sourceLangFace"
+                ></ul>
+              </div>
+              <select
+                id="sourceLang"
+                class="lang-select-native"
+                title="Language of the page text"
+                tabindex="-1"
+                aria-hidden="true"
+                disabled
+              ></select>
+            </div>
           </label>
           <label class="lang-field">
             <span class="lang-field-label">Target language</span>
-            <select
-              id="targetLang"
-              class="lang-select"
-              title="Language to translate into"
-              disabled
-            ></select>
+            <div class="custom-select">
+              <button
+                type="button"
+                class="custom-select-trigger"
+                id="targetLangFace"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="targetLangListbox"
+                disabled
+              >
+                <span class="custom-select-value">—</span>
+                <span class="custom-select-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="custom-select-dropdown" id="targetLangDropdown" hidden>
+                <ul
+                  class="custom-select-options"
+                  id="targetLangListbox"
+                  role="listbox"
+                  aria-labelledby="targetLangFace"
+                ></ul>
+              </div>
+              <select
+                id="targetLang"
+                class="lang-select-native"
+                title="Language to translate into"
+                tabindex="-1"
+                aria-hidden="true"
+                disabled
+              ></select>
+            </div>
           </label>
         </div>
 
