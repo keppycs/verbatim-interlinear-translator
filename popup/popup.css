@@ -190,6 +190,35 @@ body.vit-ui.vit-popup .lang-select option {
   transition: color var(--vit-duration) var(--vit-ease);
 }
 
+.status-line {
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--vit-muted);
+  border-top: 1px solid rgba(255, 153, 51, 0.14);
+}
+
+.status-line[hidden] {
+  display: none !important;
+}
+
+.idle-hint {
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--vit-muted);
+  border-top: 1px solid rgba(255, 153, 51, 0.12);
+  white-space: pre-line;
+}
+
+.idle-hint[hidden] {
+  display: none !important;
+}
+
 .popup-error {
   margin: 14px 0 0;
   padding: 11px 12px;

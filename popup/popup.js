@@ -4,6 +4,8 @@ import { defaultSettings } from "../lib/defaultSettings.js";
 const subEl = document.getElementById("toggleSub");
 const toggleEl = document.getElementById("pageToggle");
 const loadingEl = document.getElementById("toggleLoading");
+const statusLineEl = document.getElementById("statusLine");
+const idleHintEl = document.getElementById("idleHint");
 const errorEl = document.getElementById("popupError");
 const sourceLangEl = document.getElementById("sourceLang");
 const targetLangEl = document.getElementById("targetLang");
@@ -12,6 +14,9 @@ const NO_BACKEND_MESSAGE =
   "Add at least one translation API in Options — use “Options & API keys” below.";
 
 const NO_TARGET_MESSAGE = "Choose a target language above before turning interlinear mode on.";
+
+/** While the toggle is busy, poll the tab for live phase/detail (session sync can lag). */
+let tabStatePollTimer = null;
 
 function setPopupError(text) {
   if (!errorEl) return;
@@ -35,19 +40,125 @@ function formatToggleError(res) {
 
 function setSubtext(enabled) {
   if (subEl) {
-    subEl.textContent = enabled ? "On — whole page" : "Off";
+    subEl.textContent = enabled ? "Interlinear on" : "Off";
   }
   if (toggleEl) toggleEl.checked = !!enabled;
 }
 
-/** Disables controls and shows spinner while the content script is translating. */
-function setLoading(loading) {
+/**
+ * When interlinear is on and not loading: explain the pipeline and what “On” means, plus last-run stats.
+ * @param {boolean} on
+ * @param {boolean} loading
+ * @param {string} [lastSummary]
+ */
+function updateIdleHintForSnap(on, loading, lastSummary) {
+  if (!idleHintEl) return;
+  if (!on || loading) {
+    idleHintEl.hidden = true;
+    return;
+  }
+  idleHintEl.hidden = false;
+  const intro =
+    "“Interlinear on” means this tab shows glosses — not that the last run used only the cache.";
+  const order =
+    "How it runs: ① word glosses from the extension cache first, ② missing words via your Translation API settings (backend / auto chain), ③ full-sentence lines after that (same cache + API).";
+  const trimmed = typeof lastSummary === "string" ? lastSummary.trim() : "";
+  idleHintEl.textContent = trimmed ? `${intro}\n\n${order}\n\n${trimmed}` : `${intro}\n\n${order}`;
+}
+
+/**
+ * Short label next to “Interlinear mode” while work is in progress.
+ * @param {string} [phase]
+ */
+function formatStatusSub(phase) {
+  switch (phase) {
+    case "cache":
+      return "From cache…";
+    case "api_words":
+      return "API (words)…";
+    case "api_sentences":
+      return "API (sentences)…";
+    default:
+      return "Working…";
+  }
+}
+
+/**
+ * Longer explanation below the toggle (cache vs API steps).
+ * @param {string} [phase]
+ * @param {string | null} [detail]
+ */
+function formatStatusLine(phase, detail) {
+  if (detail && String(detail).trim()) {
+    return String(detail).trim();
+  }
+  switch (phase) {
+    case "cache":
+      return "Reading saved glosses from the extension cache and laying out the page. No network yet.";
+    case "api_words":
+      return "Requesting missing word glosses from the translation API.";
+    case "api_sentences":
+      return "Full-sentence lines: cache when this text was translated before, otherwise the translation API.";
+    default:
+      return "";
+  }
+}
+
+function stopTabStatePoll() {
+  if (tabStatePollTimer != null) {
+    clearInterval(tabStatePollTimer);
+    tabStatePollTimer = null;
+  }
+}
+
+function startTabStatePoll() {
+  stopTabStatePoll();
+  tabStatePollTimer = setInterval(() => {
+    void (async () => {
+      if (!toggleEl?.disabled) {
+        stopTabStatePoll();
+        return;
+      }
+      const tab = await getActiveTab();
+      if (!tab?.id || isRestrictedUrl(tab.url || "")) return;
+      chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
+        if (chrome.runtime.lastError) return;
+        applyTabStateSnapshot(res);
+      });
+    })();
+  }, 320);
+}
+
+/**
+ * Disables controls and shows spinner while the content script is translating.
+ * @param {boolean} loading
+ * @param {string} [phase] idle | cache | api_words | api_sentences
+ * @param {string | null} [detail]
+ */
+function setLoading(loading, phase = "idle", detail = null) {
   if (loadingEl) loadingEl.hidden = !loading;
   if (toggleEl) toggleEl.disabled = !!loading;
   if (sourceLangEl) sourceLangEl.disabled = !!loading;
   if (targetLangEl) targetLangEl.disabled = !!loading;
+  /** While loading, default unknown phase to cache (matches content script start). */
+  const effectivePhase =
+    loading && (!phase || phase === "idle") ? "cache" : phase || "idle";
+  if (statusLineEl) {
+    if (loading) {
+      statusLineEl.textContent = formatStatusLine(effectivePhase, detail);
+      statusLineEl.hidden = false;
+    } else {
+      statusLineEl.textContent = "";
+      statusLineEl.hidden = true;
+    }
+  }
   if (loading && subEl) {
-    subEl.textContent = "Translating…";
+    subEl.textContent = formatStatusSub(effectivePhase);
+  }
+  if (loading) {
+    startTabStatePoll();
+  } else {
+    stopTabStatePoll();
   }
 }
 
@@ -130,6 +241,27 @@ function saveLanguagesPartial(patch) {
   chrome.storage.sync.set(patch, () => void chrome.runtime.lastError);
 }
 
+/** Apply tab snapshot from session storage or a GET_PAGE_TRANSLATION_STATE response. */
+function applyTabStateSnapshot(snap) {
+  if (!snap || typeof snap !== "object") return;
+  const loading = !!snap.loading;
+  const on = !!(snap.toggleOn ?? snap.enabled ?? loading);
+  const phase = typeof snap.statusPhase === "string" ? snap.statusPhase : "idle";
+  const detail = snap.statusDetail != null ? String(snap.statusDetail) : null;
+  const lastSummary = snap.lastLoadSummary != null ? String(snap.lastLoadSummary) : "";
+  if (loading) {
+    setLoading(true, phase, detail);
+  } else {
+    setLoading(false, "idle", null);
+    if (toggleEl) toggleEl.disabled = false;
+  }
+  if (toggleEl) toggleEl.checked = on;
+  if (subEl && !loading) {
+    subEl.textContent = on ? "Interlinear on" : "Off";
+  }
+  updateIdleHintForSnap(on, loading, lastSummary);
+}
+
 /** Last state pushed from the tab via the background (instant; avoids waiting on the busy content script). */
 async function applySessionSnapshotForTab(tabId) {
   if (tabId == null) return;
@@ -137,19 +269,7 @@ async function applySessionSnapshotForTab(tabId) {
     const key = `vit_tab_${tabId}`;
     const obj = await chrome.storage.session.get(key);
     const snap = obj[key];
-    if (!snap || typeof snap !== "object") return;
-    const loading = !!snap.loading;
-    const on = !!(snap.toggleOn ?? snap.enabled ?? loading);
-    if (loading) {
-      setLoading(true);
-    } else {
-      setLoading(false);
-      if (toggleEl) toggleEl.disabled = false;
-    }
-    if (toggleEl) toggleEl.checked = on;
-    if (subEl) {
-      subEl.textContent = loading ? "Translating…" : on ? "On — whole page" : "Off";
-    }
+    applyTabStateSnapshot(snap);
   } catch {
     /* session storage may be unavailable in some environments */
   }
@@ -164,6 +284,7 @@ function syncToggleFromTab() {
         setLoading(false);
         setSubtext(false);
         if (toggleEl) toggleEl.disabled = true;
+        if (idleHintEl) idleHintEl.hidden = true;
         resolve();
         return;
       }
@@ -173,18 +294,7 @@ function syncToggleFromTab() {
           resolve();
           return;
         }
-        const loading = !!res?.loading;
-        const on = !!(res?.toggleOn ?? res?.enabled ?? loading);
-        if (loading) {
-          setLoading(true);
-        } else {
-          setLoading(false);
-          if (toggleEl) toggleEl.disabled = false;
-        }
-        if (toggleEl) toggleEl.checked = on;
-        if (subEl) {
-          subEl.textContent = loading ? "Translating…" : on ? "On — whole page" : "Off";
-        }
+        applyTabStateSnapshot(res);
         resolve();
       });
     })();
@@ -209,10 +319,13 @@ function applyToggleResponse(wantOn, res) {
   if (res?.ok === true) {
     setPopupError("");
     setSubtext(!!res.enabled);
+    const ls = typeof res.loadSummary === "string" ? res.loadSummary : "";
+    updateIdleHintForSnap(!!res.enabled, false, ls);
     return;
   }
   toggleEl.checked = !wantOn;
   setSubtext(!wantOn);
+  updateIdleHintForSnap(!wantOn, false, "");
   setPopupError(formatToggleError(res));
 }
 
@@ -222,6 +335,18 @@ void (async () => {
   await syncLangFromStorage();
   await syncToggleFromTab();
 })();
+
+chrome.storage.session.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "session") return;
+  void (async () => {
+    const tab = await getActiveTab();
+    if (!tab?.id) return;
+    const key = `vit_tab_${tab.id}`;
+    const ch = changes[key];
+    if (!ch?.newValue) return;
+    applyTabStateSnapshot(ch.newValue);
+  })();
+});
 
 sourceLangEl?.addEventListener("change", () => {
   setPopupError("");
@@ -287,7 +412,7 @@ toggleEl.addEventListener("change", async () => {
     setPopupError(NO_BACKEND_MESSAGE);
     return;
   }
-  setLoading(true);
+  setLoading(true, "cache", null);
   sendSetPage();
 });
 

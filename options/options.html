@@ -153,12 +153,19 @@
               <label class="field">
                 <span class="field-label">Base URL</span>
                 <input
-                  type="url"
+                  type="text"
                   id="libreTranslateBaseUrl"
                   name="libreTranslateBaseUrl"
-                  placeholder="http://localhost:5000"
+                  placeholder="http://192.168.1.10:5000 or 192.168.1.10:5000"
+                  autocomplete="off"
+                  spellcheck="false"
                 />
               </label>
+              <p class="hint">
+                Paste <code>IP:port</code> or <code>http://host:port</code> — if the scheme is omitted,
+                <code>http://</code> is added (same as typing the address in the browser bar). Language
+                codes are shortened for LibreTranslate (e.g. <code>zh-CN</code> → <code>zh</code>).
+              </p>
             </section>
 
             <section class="panel" aria-labelledby="h-custom">

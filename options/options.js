@@ -1,5 +1,6 @@
 import { BackendId } from "../lib/translation/constants.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
+import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
 
 const backendLabels = [
   [BackendId.AUTO, "Auto"],
@@ -22,6 +23,8 @@ function fillBackendSelect() {
 }
 
 function formToObject() {
+  const libreRaw = document.getElementById("libreTranslateBaseUrl").value.trim();
+  const customRaw = document.getElementById("customTranslateBaseUrl").value.trim();
   return {
     translationBackend: document.getElementById("translationBackend").value,
     deeplAuthKey: document.getElementById("deeplAuthKey").value.trim(),
@@ -29,8 +32,8 @@ function formToObject() {
     googleApiKey: document.getElementById("googleApiKey").value.trim(),
     azureTranslatorKey: document.getElementById("azureTranslatorKey").value.trim(),
     azureTranslatorRegion: document.getElementById("azureTranslatorRegion").value.trim(),
-    libreTranslateBaseUrl: document.getElementById("libreTranslateBaseUrl").value.trim(),
-    customTranslateBaseUrl: document.getElementById("customTranslateBaseUrl").value.trim(),
+    libreTranslateBaseUrl: normalizeHttpServiceBaseUrl(libreRaw),
+    customTranslateBaseUrl: normalizeHttpServiceBaseUrl(customRaw),
     customTranslatePath:
       document.getElementById("customTranslatePath").value.trim() || "/translate",
     layoutMode: document.getElementById("layoutMode").value,

@@ -1,35 +1,103 @@
-/* Scoped under [data-vit-root] to reduce collisions with host pages */
+/* Scoped under [data-vit-root] / [data-vit-wrap] to reduce collisions with host pages */
+
+/* Multiline stanza: <br> between lines; shrink-wrap width so we don’t stretch to the full paragraph */
+[data-vit-wrap] {
+  display: inline-block;
+  vertical-align: baseline;
+  white-space: inherit;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  padding: 0 0 0.85em;
+  margin: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+}
+
+[data-vit-wrap] [data-vit-root] {
+  padding-bottom: 0;
+}
+
 [data-vit-root] {
-  display: inline;
-  white-space: normal;
+  --vit-translation-size: 0.75em;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  vertical-align: baseline;
+  white-space: inherit;
+  box-sizing: border-box;
+  /* Shrink to content; avoids inline-flex + % widths expanding to the whole line */
+  width: max-content;
+  max-width: 100%;
+  padding: 0 0 0.85em;
+  margin: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+  gap: 0.28em;
+}
+
+[data-vit-root] .vit-words-row {
+  display: block;
+  line-height: 1.42;
+  padding: 0;
+}
+
+/* Full sentence: same size as gloss row; no width:100% (that pulls the block to the paragraph width) */
+[data-vit-root] .vit-full-line[data-vit-full],
+[data-vit-root] .vit-full-line {
+  display: block !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  visibility: visible !important;
+  font-size: var(--vit-translation-size) !important;
+  font-weight: 500 !important;
+  line-height: 1.45 !important;
+  opacity: 0.92 !important;
+  color: inherit !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  word-break: break-word;
+  position: relative;
+  z-index: 0;
 }
 
 [data-vit-root] .vit-word {
   box-sizing: border-box;
 }
 
-[data-vit-root][data-vit-layout="inject"] .vit-word {
+/* Interlinear columns: source (original) on top, gloss directly underneath */
+[data-vit-root][data-vit-layout="inject"] .vit-word,
+[data-vit-root][data-vit-layout="absolute"] .vit-word {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   vertical-align: baseline;
   margin-right: 0.35em;
-  line-height: 1.25;
+  margin-bottom: 0.35em;
 }
 
-[data-vit-root][data-vit-layout="inject"] .vit-word:last-child {
+[data-vit-root][data-vit-layout="inject"] .vit-word:last-child,
+[data-vit-root][data-vit-layout="absolute"] .vit-word:last-child {
   margin-right: 0;
 }
 
-[data-vit-root][data-vit-layout="inject"] .vit-source {
+[data-vit-root][data-vit-layout="inject"] .vit-source,
+[data-vit-root][data-vit-layout="absolute"] .vit-source {
   display: inline-block;
+  font-size: 1em;
+  line-height: 1.4;
+  opacity: 0.98;
 }
 
-[data-vit-root][data-vit-layout="inject"] .vit-gloss {
+[data-vit-root][data-vit-layout="inject"] .vit-gloss,
+[data-vit-root][data-vit-layout="absolute"] .vit-gloss {
   display: block;
-  font-size: 0.72em;
-  line-height: 1.15;
-  opacity: 0.92;
+  font-size: var(--vit-translation-size);
+  line-height: 1.28;
+  opacity: 0.85;
   max-width: 12em;
   text-align: center;
   word-break: break-word;
@@ -38,32 +106,5 @@
 [data-vit-root] .vit-gloss.vit-gloss-pending {
   opacity: 0.45;
   font-style: italic;
-  letter-spacing: 0.06em;
-}
-
-[data-vit-root][data-vit-layout="absolute"] .vit-word {
-  position: relative;
-  display: inline;
-  margin-right: 0.35em;
-  vertical-align: baseline;
-}
-
-[data-vit-root][data-vit-layout="absolute"] .vit-word:last-child {
-  margin-right: 0;
-}
-
-[data-vit-root][data-vit-layout="absolute"] .vit-gloss {
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  transform: translateX(-50%);
-  margin-top: 1px;
-  font-size: 0.72em;
-  line-height: 1.15;
-  white-space: normal;
-  max-width: 14em;
-  text-align: center;
-  word-break: break-word;
-  z-index: 2147483646;
-  pointer-events: none;
+  letter-spacing: 0.05em;
 }

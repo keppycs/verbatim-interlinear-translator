@@ -1,4 +1,4 @@
-import { translateWithCache, probeCacheOnly } from "../lib/translation/cache.js";
+import { translateWithCache, probeCacheOnly, translateWithoutCache } from "../lib/translation/cache.js";
 import { hasConfiguredTranslationBackend } from "../lib/translation/resolve.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
 
@@ -11,7 +11,7 @@ function ensureContextMenu() {
     chrome.contextMenus.create(
       {
         id: "vit-toggle-page",
-        title: "Toggle Verbatim interlinear (whole page)",
+        title: "Toggle Verbatim interlinear on this page",
         contexts: ["page"],
       },
       () => {
@@ -54,8 +54,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const enabled = !!s.enabled;
     const loading = !!s.loading;
     const toggleOn = !!(s.toggleOn ?? (enabled || loading));
+    const statusPhase = typeof s.statusPhase === "string" ? s.statusPhase : "idle";
+    const statusDetail = s.statusDetail != null ? String(s.statusDetail) : null;
+    const lastLoadSummary = s.lastLoadSummary != null ? String(s.lastLoadSummary) : null;
     void chrome.storage.session.set({
-      [`vit_tab_${id}`]: { enabled, loading, toggleOn, updatedAt: Date.now() },
+      [`vit_tab_${id}`]: {
+        enabled,
+        loading,
+        toggleOn,
+        statusPhase,
+        statusDetail,
+        lastLoadSummary,
+        updatedAt: Date.now(),
+      },
     });
     return;
   }
@@ -91,6 +102,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } catch {
         sendResponse({ ok: false });
       }
+    })();
+    return true;
+  }
+  if (msg?.type === "TRANSLATE_NO_CACHE") {
+    (async () => {
+      const stored = await chrome.storage.sync.get(null);
+      const settings = mergeSettings(stored);
+      const sourceLang = msg.sourceLang ?? settings.sourceLang;
+      const targetLang = String(msg.targetLang ?? settings.targetLang ?? "").trim();
+      if (!targetLang) {
+        sendResponse({
+          error: "no_target_language",
+          message: "Choose a target language in the extension toolbar menu.",
+        });
+        return;
+      }
+      const result = await translateWithoutCache(settings, msg.texts || [], sourceLang, targetLang);
+      sendResponse(result);
     })();
     return true;
   }

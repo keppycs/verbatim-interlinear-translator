@@ -28,7 +28,10 @@
           </label>
         </div>
 
-        <div class="row row--toggle">
+        <div
+          class="row row--toggle"
+          title="Interlinear on: this tab shows word glosses. That does not mean everything came from cache — see the note below."
+        >
           <div class="row-label">
             <strong>Interlinear mode</strong>
             <span id="toggleSub">Off</span>
@@ -44,6 +47,10 @@
             </label>
           </div>
         </div>
+
+        <p id="statusLine" class="status-line" role="status" aria-live="polite" hidden></p>
+
+        <p id="idleHint" class="idle-hint" role="region" aria-label="How interlinear loading works" hidden></p>
 
         <p id="popupError" class="popup-error" role="alert" hidden></p>
 
