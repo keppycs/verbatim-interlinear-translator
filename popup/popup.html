@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -34,14 +34,31 @@
         <div class="lang-fields lang-fields--swap" role="group" aria-label="Translation languages">
           <label class="lang-field">
             <span class="lang-field-label">Source language</span>
-            <select id="sourceLang" class="lang-select" title="Language of the page text" disabled></select>
+            <select
+              id="sourceLang"
+              class="lang-select"
+              title="Language of the page text"
+              disabled
+            ></select>
           </label>
-          <button type="button" class="btn-swap" id="swapLang" aria-label="Swap source and target languages" title="Swap languages" disabled>
+          <button
+            type="button"
+            class="btn-swap"
+            id="swapLang"
+            aria-label="Swap source and target languages"
+            title="Swap languages"
+            disabled
+          >
             <span aria-hidden="true">⇄</span>
           </button>
           <label class="lang-field">
             <span class="lang-field-label">Target language</span>
-            <select id="targetLang" class="lang-select" title="Language to translate into" disabled></select>
+            <select
+              id="targetLang"
+              class="lang-select"
+              title="Language to translate into"
+              disabled
+            ></select>
           </label>
         </div>
 
@@ -50,7 +67,9 @@
             <input type="checkbox" id="useTranslationCache" checked />
             <span>Use translation cache</span>
           </label>
-          <button type="button" class="btn-clear-cache" id="clearTranslationCache">Clear cache</button>
+          <button type="button" class="btn-clear-cache" id="clearTranslationCache">
+            Clear cache
+          </button>
         </div>
         <p id="cacheStatus" class="cache-status" role="status" aria-live="polite" hidden></p>
 
@@ -76,11 +95,17 @@
 
         <p id="statusLine" class="status-line" role="status" aria-live="polite" hidden></p>
 
-        <p id="idleHint" class="idle-hint" role="region" aria-label="How interlinear loading works" hidden></p>
+        <p
+          id="idleHint"
+          class="idle-hint"
+          role="region"
+          aria-label="How interlinear loading works"
+          hidden
+        ></p>
 
         <p id="popupError" class="popup-error" role="alert" hidden></p>
 
-        <p class="hint-kbd">Shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> · Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd></p>
+        <p class="hint-kbd">Shortcut: <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd></p>
       </div>
     </div>
     <script type="module" src="popup.js"></script>

@@ -67,6 +67,12 @@ function formatToggleError(res) {
   const e = res?.error;
   if (e === "translation_mismatch") return "Translation could not be completed. Try again.";
   if (e === "no_target_language") return NO_TARGET_MESSAGE;
+  if (e === "no_page_lang") {
+    return 'This page needs <html lang="…"> when source is “Auto”, or pick a fixed source language.';
+  }
+  if (e === "source_same_as_target") {
+    return "Source and target language are the same. Choose a different target.";
+  }
   if (typeof e === "string") return e;
   return "Something went wrong.";
 }
@@ -79,40 +85,81 @@ function setSubtext(enabled) {
 }
 
 /**
+ * Match a LibreTranslate `/languages` row by code (handles zh vs zh-CN style mismatches).
+ * Prefer exact `row.code` first — otherwise `zh` can win before `zh-CN` and you get the wrong `targets` list.
+ * @param {Array<{ code: string; name: string; targets: string[] }>} languages
+ * @param {string} code
+ */
+function findLanguageRow(languages, code) {
+  if (!code || !languages?.length) return null;
+  const exact = languages.find((r) => r.code === code);
+  if (exact) return exact;
+  const want = toLibreStyleLang(code);
+  return languages.find((r) => toLibreStyleLang(r.code) === want) ?? null;
+}
+
+/**
  * @param {Array<{ code: string; name: string; targets: string[] }>} languages
  * @param {string} code
  */
 function displayNameForCode(languages, code) {
-  const row = languages.find((r) => r.code === code);
+  const row = findLanguageRow(languages, code);
   return row ? row.name : code;
 }
 
 /**
- * @param {Array<{ code: string; name: string; targets: string[] }>} languages
- * @param {string} sourceValue
+ * Human-readable language name for a primary subtag when Libre has no matching row.
+ * @param {string} primary
  */
-function targetCodesForSource(languages, sourceValue) {
-  if (sourceValue === "auto") {
-    const set = new Set();
-    for (const row of languages) {
-      if (Array.isArray(row.targets)) {
-        for (const t of row.targets) set.add(t);
-      }
-    }
-    if (set.size === 0) {
-      for (const row of languages) {
-        if (row.code) set.add(row.code);
-      }
-    }
-    return Array.from(set).sort();
+function intlLanguageNameForPrimary(primary) {
+  if (!primary) return "";
+  try {
+    const loc = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en";
+    const dn = new Intl.DisplayNames([loc], { type: "language" });
+    const tag = primary.toLowerCase();
+    const name = dn.of(tag);
+    return name && name !== tag ? name : primary;
+  } catch {
+    return primary;
   }
-  const st = toLibreStyleLang(sourceValue);
-  const row = languages.find((r) => r.code === sourceValue || r.code === st);
-  if (!row || !Array.isArray(row.targets)) return [];
-  return [...row.targets].sort();
 }
 
 /**
+ * Label for the Auto option parenthetical: Libre name when available, else Intl.
+ * @param {Array<{ code: string; name: string; targets: string[] }>} languages
+ * @param {string} primary
+ */
+function labelForAutoParenthetical(languages, primary) {
+  const row = findLanguageRow(languages, primary);
+  if (row) return row.name || row.code;
+  return intlLanguageNameForPrimary(primary);
+}
+
+/**
+ * Target codes for a concrete source: that row’s `targets` from `/languages`, excluding self.
+ * For “Auto”, the content script resolves source from &lt;html lang&gt;; use the same primary here.
+ * @param {Array<{ code: string; name: string; targets: string[] }>} languages
+ * @param {string} concreteSourceCode
+ */
+function targetCodesForConcreteSource(languages, concreteSourceCode) {
+  const row = findLanguageRow(languages, concreteSourceCode);
+  if (!row || !Array.isArray(row.targets)) return [];
+  const srcNorm = toLibreStyleLang(row.code);
+  return row.targets.filter((c) => toLibreStyleLang(c) !== srcNorm);
+}
+
+/**
+ * True if this language can be chosen as a fixed source (has at least one target other than itself).
+ * @param {Array<{ code: string; name: string; targets: string[] }>} languages
+ * @param {string} code
+ */
+function fixedSourceHasNonSelfTarget(languages, code) {
+  return targetCodesForConcreteSource(languages, code).length > 0;
+}
+
+/**
+ * Fixed source options: only Libre `/languages` rows that have at least one non-self target.
+ * The synthetic `auto` option is always first (see defaultSettings.sourceLang).
  * @param {Array<{ code: string; name: string; targets: string[] }>} languages
  */
 function rebuildSourceSelect(languages) {
@@ -122,8 +169,11 @@ function rebuildSourceSelect(languages) {
   autoOpt.value = "auto";
   autoOpt.textContent = "Auto";
   sourceLangEl.appendChild(autoOpt);
-  const sorted = [...languages].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const sorted = [...languages].sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }),
+  );
   for (const row of sorted) {
+    if (!fixedSourceHasNonSelfTarget(languages, row.code)) continue;
     const opt = document.createElement("option");
     opt.value = row.code;
     opt.textContent = row.name || row.code;
@@ -131,21 +181,76 @@ function rebuildSourceSelect(languages) {
   }
 }
 
+function setAutoSourceOptionLabel(text) {
+  const opt = sourceLangEl?.querySelector('option[value="auto"]');
+  if (opt) opt.textContent = text;
+}
+
 /**
- * @param {Array<{ code: string; name: string; targets: string[] }>} languages
- * @param {string} sourceValue
- * @param {string} [preferredTarget] - if set, prefer this value when still valid (e.g. from storage)
+ * Primary language subtag from the active tab’s &lt;html lang&gt; (same signal as translation uses for Auto).
+ * @returns {Promise<string | null>}
  */
-function rebuildTargetSelect(languages, sourceValue, preferredTarget) {
+async function getHtmlLangPrimaryForActiveTab() {
+  const tab = await getActiveTab();
+  if (!tab?.id || isRestrictedUrl(tab.url || "")) return null;
+  const resp = await new Promise((resolve) => {
+    chrome.tabs.sendMessage(tab.id, { type: "GET_HTML_LANG" }, (r) => {
+      if (chrome.runtime.lastError) resolve(null);
+      else resolve(r);
+    });
+  });
+  const primary = typeof resp?.primary === "string" ? resp.primary.trim() : "";
+  return primary || null;
+}
+
+/**
+ * Label Auto using the active tab’s &lt;html lang&gt; and Libre or Intl names.
+ * @param {string | null | undefined} [htmlPrimaryHint] - when passed (including null), avoids GET_HTML_LANG
+ */
+async function refreshAutoSourceLabel(htmlPrimaryHint) {
+  if (!lastLanguages || !sourceLangEl) return;
+  const primary =
+    htmlPrimaryHint !== undefined ? htmlPrimaryHint : await getHtmlLangPrimaryForActiveTab();
+  if (!primary) {
+    setAutoSourceOptionLabel("Auto");
+    return;
+  }
+  const name = labelForAutoParenthetical(lastLanguages, primary);
+  setAutoSourceOptionLabel(`Auto (${name})`);
+}
+
+/**
+ * Target options: placeholder first, then only that source row’s `targets` (no global union).
+ * For `auto`, the concrete source is the active tab’s &lt;html lang&gt; primary (same as content script).
+ * @param {Array<{ code: string; name: string; targets: string[] }>} languages
+ * @param {string} sourceValue - "auto" or a fixed source code (must match the source &lt;select&gt; value)
+ * @param {string} [preferredTarget] - if set, prefer this value when still valid (e.g. from storage)
+ * @param {string | null | undefined} [htmlPrimaryHint] - for `auto` only: when set (including null), skips GET_HTML_LANG
+ */
+async function rebuildTargetSelect(languages, sourceValue, preferredTarget, htmlPrimaryHint) {
   if (!targetLangEl) return;
-  const prev =
-    preferredTarget !== undefined ? preferredTarget : targetLangEl.value;
+  const prev = preferredTarget !== undefined ? preferredTarget : targetLangEl.value;
   targetLangEl.innerHTML = "";
   const placeholder = document.createElement("option");
   placeholder.value = "";
   placeholder.textContent = "Select language";
   targetLangEl.appendChild(placeholder);
-  const codes = targetCodesForSource(languages, sourceValue || "auto");
+  const src = (sourceValue || "auto").trim();
+  let codes;
+  if (src === "auto") {
+    let primary = htmlPrimaryHint;
+    if (primary === undefined) {
+      primary = await getHtmlLangPrimaryForActiveTab();
+    }
+    codes = primary ? targetCodesForConcreteSource(languages, primary) : [];
+  } else {
+    codes = targetCodesForConcreteSource(languages, src);
+  }
+  codes.sort((a, b) =>
+    displayNameForCode(languages, a).localeCompare(displayNameForCode(languages, b), undefined, {
+      sensitivity: "base",
+    }),
+  );
   for (const code of codes) {
     const opt = document.createElement("option");
     opt.value = code;
@@ -160,18 +265,31 @@ function rebuildTargetSelect(languages, sourceValue, preferredTarget) {
   }
 }
 
-function applyLanguageValuesFromStorage() {
-  if (!lastLanguages || !sourceLangEl || !targetLangEl) return;
-  chrome.storage.sync.get(["sourceLang", "targetLang"], (stored) => {
-    const merged = { ...defaultSettings, ...stored };
-    const src = merged.sourceLang && merged.sourceLang !== "" ? merged.sourceLang : "auto";
-    const rawTarget = typeof merged.targetLang === "string" ? merged.targetLang.trim() : "";
-    if ([...sourceLangEl.options].some((o) => o.value === src)) {
+/**
+ * @param {{ preferSource?: string, preferTarget?: string }} [opts] - values from the UI before a rebuild (beats stale storage during sync.set races)
+ * @returns {Promise<void>}
+ */
+function applyLanguageValuesFromStorage(opts = {}) {
+  if (!lastLanguages || !sourceLangEl || !targetLangEl) return Promise.resolve();
+  const preferSource = typeof opts.preferSource === "string" ? opts.preferSource : "";
+  const preferTarget = typeof opts.preferTarget === "string" ? opts.preferTarget.trim() : "";
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(["sourceLang", "targetLang"], (stored) => {
+      const merged = { ...defaultSettings, ...stored };
+      const fromStorage =
+        merged.sourceLang && merged.sourceLang !== "" ? merged.sourceLang : "auto";
+      const rawTarget = typeof merged.targetLang === "string" ? merged.targetLang.trim() : "";
+      const optionValues = [...sourceLangEl.options].map((o) => o.value);
+      const src = pickSourceLangValue(optionValues, preferSource, fromStorage);
       sourceLangEl.value = src;
-    } else {
-      sourceLangEl.value = "auto";
-    }
-    rebuildTargetSelect(lastLanguages, sourceLangEl.value, rawTarget);
+      const preferredTarget = preferTarget || rawTarget;
+      void (async () => {
+        const primaryHint = await getHtmlLangPrimaryForActiveTab();
+        await rebuildTargetSelect(lastLanguages, sourceLangEl.value, preferredTarget, primaryHint);
+        await refreshAutoSourceLabel(primaryHint);
+        resolve();
+      })();
+    });
   });
 }
 
@@ -204,10 +322,12 @@ async function refreshLanguagesUi() {
   if (targetLangEl) targetLangEl.disabled = true;
   if (swapLangEl) swapLangEl.disabled = true;
   try {
+    const preferSource = sourceLangEl ? sourceLangEl.value : "";
+    const preferTarget = targetLangEl ? targetLangEl.value : "";
     const languages = await fetchLanguagesFromSw(raw);
     lastLanguages = languages;
     rebuildSourceSelect(languages);
-    applyLanguageValuesFromStorage();
+    await applyLanguageValuesFromStorage({ preferSource, preferTarget });
     if (sourceLangEl) sourceLangEl.disabled = false;
     if (targetLangEl) targetLangEl.disabled = false;
     if (swapLangEl) swapLangEl.disabled = false;
@@ -253,11 +373,11 @@ function updateIdleHintForSnap(on, loading, lastSummary) {
 function formatStatusSub(phase) {
   switch (phase) {
     case "cache":
-      return "From cache…";
+      return "Loading from cache…";
     case "api_words":
-      return "API (words)…";
+      return "Translating words";
     case "api_sentences":
-      return "API (sentences)…";
+      return "Translating sentences";
     default:
       return "Working…";
   }
@@ -322,8 +442,7 @@ function setLoading(loading, phase = "idle", detail = null) {
   if (swapLangEl) swapLangEl.disabled = !!loading || !lastLanguages;
   if (useCacheEl) useCacheEl.disabled = !!loading;
   if (clearCacheEl) clearCacheEl.disabled = !!loading;
-  const effectivePhase =
-    loading && (!phase || phase === "idle") ? "cache" : phase || "idle";
+  const effectivePhase = loading && (!phase || phase === "idle") ? "cache" : phase || "idle";
   if (statusLineEl) {
     if (loading) {
       statusLineEl.textContent = formatStatusLine(effectivePhase, detail);
@@ -358,15 +477,39 @@ async function getActiveTab() {
   return tab;
 }
 
+async function getGlobalPageTranslationOn() {
+  const o = await chrome.storage.sync.get(["globalPageTranslation"]);
+  return o?.globalPageTranslation === true;
+}
+
 function saveLanguagesPartial(patch) {
-  chrome.storage.sync.set(patch, () => void chrome.runtime.lastError);
+  return new Promise((resolve) => {
+    chrome.storage.sync.set(patch, () => {
+      void chrome.runtime.lastError;
+      resolve();
+    });
+  });
+}
+
+/**
+ * Prefer UI selection when still valid (fixes stale sync before storage.write finishes).
+ * @param {string[]} optionValues
+ * @param {string} prefer
+ * @param {string} fromStorage
+ */
+function pickSourceLangValue(optionValues, prefer, fromStorage) {
+  const p = (prefer || "").trim();
+  if (p && optionValues.includes(p)) return p;
+  const s = (fromStorage || "").trim() || "auto";
+  if (optionValues.includes(s)) return s;
+  return "auto";
 }
 
 /** Apply tab snapshot from session storage or a GET_PAGE_TRANSLATION_STATE response. */
-function applyTabStateSnapshot(snap) {
+function applyTabStateSnapshot(snap, globalOn = false) {
   if (!snap || typeof snap !== "object") return;
   const loading = !!snap.loading;
-  const on = !!(snap.toggleOn ?? snap.enabled ?? loading);
+  const on = globalOn || !!(snap.toggleOn ?? snap.enabled ?? loading);
   const phase = typeof snap.statusPhase === "string" ? snap.statusPhase : "idle";
   const detail = snap.statusDetail != null ? String(snap.statusDetail) : null;
   const lastSummary = snap.lastLoadSummary != null ? String(snap.lastLoadSummary) : "";
@@ -383,13 +526,13 @@ function applyTabStateSnapshot(snap) {
   updateIdleHintForSnap(on, loading, lastSummary);
 }
 
-async function applySessionSnapshotForTab(tabId) {
+async function applySessionSnapshotForTab(tabId, globalOn) {
   if (tabId == null) return;
   try {
     const key = `vit_tab_${tabId}`;
     const obj = await chrome.storage.session.get(key);
     const snap = obj[key];
-    applyTabStateSnapshot(snap);
+    applyTabStateSnapshot(snap, globalOn);
   } catch {
     /* session storage may be unavailable */
   }
@@ -400,21 +543,26 @@ function syncToggleFromTab() {
     void (async () => {
       setPopupError("");
       const tab = await getActiveTab();
+      const globalOn = await getGlobalPageTranslationOn();
       if (!tab?.id || isRestrictedUrl(tab.url || "")) {
         setLoading(false);
-        setSubtext(false);
-        if (toggleEl) toggleEl.disabled = true;
+        setSubtext(globalOn);
+        if (toggleEl) {
+          toggleEl.checked = globalOn;
+          toggleEl.disabled = true;
+        }
         if (idleHintEl) idleHintEl.hidden = true;
         resolve();
         return;
       }
-      await applySessionSnapshotForTab(tab.id);
+      await applySessionSnapshotForTab(tab.id, globalOn);
       chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
         if (chrome.runtime.lastError) {
+          applyTabStateSnapshot({ toggleOn: globalOn, enabled: false, loading: false }, globalOn);
           resolve();
           return;
         }
-        applyTabStateSnapshot(res);
+        applyTabStateSnapshot(res, globalOn);
         resolve();
       });
     })();
@@ -489,17 +637,21 @@ clearCacheEl?.addEventListener("click", () => {
 sourceLangEl?.addEventListener("change", () => {
   if (!lastLanguages) return;
   setPopupError("");
-  const v = sourceLangEl.value || "auto";
   const prev = targetLangEl?.value || "";
-  rebuildTargetSelect(lastLanguages, v, prev);
-  const still = targetLangEl?.value?.trim() || "";
-  saveLanguagesPartial({ sourceLang: v, targetLang: still });
+  void (async () => {
+    const v = (sourceLangEl.value || "auto").trim();
+    const primaryHint = await getHtmlLangPrimaryForActiveTab();
+    await rebuildTargetSelect(lastLanguages, v, prev, primaryHint);
+    await refreshAutoSourceLabel(primaryHint);
+    const still = targetLangEl?.value?.trim() || "";
+    await saveLanguagesPartial({ sourceLang: v, targetLang: still });
+  })();
 });
 
 targetLangEl?.addEventListener("change", () => {
   setPopupError("");
   const v = targetLangEl.value.trim();
-  saveLanguagesPartial({ targetLang: v });
+  void saveLanguagesPartial({ targetLang: v });
 });
 
 swapLangEl?.addEventListener("click", () => {
@@ -514,9 +666,10 @@ swapLangEl?.addEventListener("click", () => {
     if (!tgt) return;
     patch = { sourceLang: tgt, targetLang: src };
   }
-  chrome.storage.sync.set(patch, () => {
-    applyLanguageValuesFromStorage();
-  });
+  void (async () => {
+    await saveLanguagesPartial(patch);
+    await applyLanguageValuesFromStorage();
+  })();
 });
 
 void (async () => {
@@ -532,7 +685,25 @@ chrome.storage.session.onChanged.addListener((changes, areaName) => {
     const key = `vit_tab_${tab.id}`;
     const ch = changes[key];
     if (!ch?.newValue) return;
-    applyTabStateSnapshot(ch.newValue);
+    const globalOn = await getGlobalPageTranslationOn();
+    applyTabStateSnapshot(ch.newValue, globalOn);
+  })();
+});
+
+chrome.storage.sync.onChanged.addListener((changes) => {
+  if (!changes.globalPageTranslation) return;
+  void (async () => {
+    const globalOn = await getGlobalPageTranslationOn();
+    const tab = await getActiveTab();
+    if (!tab?.id || isRestrictedUrl(tab.url || "")) {
+      setSubtext(globalOn);
+      if (toggleEl) toggleEl.checked = globalOn;
+      return;
+    }
+    chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" }, (res) => {
+      if (chrome.runtime.lastError) return;
+      applyTabStateSnapshot(res, globalOn);
+    });
   })();
 });
 
@@ -560,6 +731,7 @@ toggleEl?.addEventListener("change", async () => {
   };
 
   if (!wantOn) {
+    await saveLanguagesPartial({ globalPageTranslation: false });
     sendSetPage();
     return;
   }

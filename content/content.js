@@ -269,10 +269,63 @@ const MUTATION_DEBOUNCE_MS = 450;
 
 const NO_BACKEND_MESSAGE = "Set your LibreTranslate URL in the extension menu.";
 
+/**
+ * Primary language subtag from a BCP-47 `lang` value (e.g. en-US → en).
+ * @param {string} raw
+ * @returns {string} lowercase ISO 639 code, or "" if unusable
+ */
+function primaryLangFromHtmlLang(raw) {
+  if (typeof raw !== "string") return "";
+  const t = raw.trim();
+  if (!t) return "";
+  const base = t.split(/[-_]/)[0];
+  if (!/^[A-Za-z]{2,3}$/.test(base)) return "";
+  return base.toLowerCase();
+}
+
+/**
+ * LibreTranslate-style primary subtag for comparing source vs target.
+ * @param {string} code
+ */
+function librePrimarySubtag(code) {
+  if (typeof code !== "string") return "";
+  const t = code.trim();
+  if (!t) return "";
+  const i = t.indexOf("-");
+  return (i === -1 ? t : t.slice(0, i)).toLowerCase();
+}
+
+/**
+ * When the user picks "Auto", use only the document `<html lang="…">` (no API detection).
+ * @param {string} storedSource - "auto" or an explicit language code
+ * @returns {{ ok: true, sourceLang: string } | { ok: false, error: string, message: string }}
+ */
+function resolveAutoSourceToConcrete(storedSource) {
+  const src = (storedSource || "auto").trim() || "auto";
+  if (src !== "auto") {
+    return { ok: true, sourceLang: src };
+  }
+  const raw = document.documentElement.getAttribute("lang") || document.documentElement.lang || "";
+  const primary = primaryLangFromHtmlLang(raw);
+  if (!primary) {
+    return {
+      ok: false,
+      error: "no_page_lang",
+      message:
+        'Source is “Auto”, but this page has no usable <html lang="…">. Set a language on the root element, or choose a fixed source language in the extension menu.',
+    };
+  }
+  return { ok: true, sourceLang: primary };
+}
+
 function storageGet() {
   return new Promise((resolve) => {
     chrome.storage.sync.get(null, resolve);
   });
+}
+
+function persistGlobalPageTranslation(enabled) {
+  chrome.storage.sync.set({ globalPageTranslation: !!enabled }, () => void chrome.runtime.lastError);
 }
 
 function sendTranslate(texts, sourceLang, targetLang) {
@@ -585,9 +638,10 @@ function startObserveNewContent() {
 
 /**
  * Walk the DOM for plain text not yet wrapped in interlinear spans, translate, and replace.
- * Phase 1: cache probe + mount (cached glosses and … for misses) — no translation API.
- * Phase 2: API only for cache misses (failures keep the toggle on and leave … / cached glosses).
- * Full-sentence lines run after phase 2 so word-level cache is applied before any network.
+ * Phase 1: cache probe + mount per segment (cached glosses and … for misses).
+ * Phase 2: API for cache misses runs in parallel with phase 1 — each segment’s missing words
+ * translate as soon as that segment’s cache probe finishes (not after the full-page cache scan).
+ * Full-sentence lines run after all word-level work so glosses are applied first.
  * @param {{ activatingFirst?: boolean }} [options] - First enable: set pageTranslationEnabled after phase 1 so the popup stays on if the API fails later.
  */
 function translateWholePage(options = {}) {
@@ -601,7 +655,7 @@ function translateWholePage(options = {}) {
     translationInProgress = true;
     setTranslationStatus(
       "cache",
-      "Extension cache — apply saved word glosses first (no API calls yet)."
+      "Extension cache — each segment applies cached glosses first; missing words call the API as that segment finishes (not after the whole page)."
     );
     stopObserveNewContent();
     try {
@@ -614,7 +668,24 @@ function translateWholePage(options = {}) {
           message: "Choose a target language in the extension toolbar menu.",
         };
       }
-      const sourceLang = (stored.sourceLang || "auto").trim() || "auto";
+      const sourceLangSetting = (stored.sourceLang || "auto").trim() || "auto";
+      const resolvedSource = resolveAutoSourceToConcrete(sourceLangSetting);
+      if (!resolvedSource.ok) {
+        return {
+          ok: false,
+          error: resolvedSource.error,
+          message: resolvedSource.message,
+        };
+      }
+      const sourceLang = resolvedSource.sourceLang;
+      if (librePrimarySubtag(sourceLang) === librePrimarySubtag(targetLang)) {
+        return {
+          ok: false,
+          error: "source_same_as_target",
+          message:
+            "Source and target language are the same. Choose a different target (or a fixed source language) in the extension menu.",
+        };
+      }
 
       const textNodes = collectTextNodes();
       const segments = buildSegments(textNodes);
@@ -674,6 +745,130 @@ function translateWholePage(options = {}) {
       /** @type {DeferredWordApi[]} */
       const deferredWordApi = [];
 
+      /** Set if phase 1 aborts (e.g. probe shape error); in-flight word-API tasks skip DOM updates. */
+      let abortWholePass = false;
+
+      /** @type {Promise<void>[]} */
+      const wordApiPromises = [];
+
+      let apiErrorToastShown = false;
+      /** First successful word-level API response reports which backend responded. */
+      let wordApiBackendReported = false;
+      function showApiErrorOnce(message) {
+        if (apiErrorToastShown) return;
+        apiErrorToastShown = true;
+        const m =
+          message ||
+          "Could not reach the translation API. Cached glosses stay visible; try again later.";
+        setTranslationStatus("api_words", m);
+        showToast(m);
+      }
+
+      function noteWordApiBackend(backend) {
+        if (wordApiBackendReported || !backend) return;
+        const name = friendlyBackendName(backend);
+        if (!name) return;
+        wordApiBackendReported = true;
+        setTranslationStatus("api_words", `Translation API (${name}): missing word glosses`);
+      }
+
+      let firstWordApiNotified = false;
+      function noteFirstWordApi() {
+        if (firstWordApiNotified) return;
+        firstWordApiNotified = true;
+        setTranslationStatus("api_words", "Translation API — missing word glosses (LibreTranslate).");
+      }
+
+      /**
+       * Fills glosses for one segment (runs concurrently with phase 1 for other segments).
+       * @param {DeferredWordApi} job
+       */
+      async function processDeferredWordJob(job) {
+        if (abortWholePass) return;
+        if (job.kind === "all_miss") {
+          noteFirstWordApi();
+          const tr = await sendTranslateWordsInChunks(job.words, sourceLang, targetLang);
+          if (abortWholePass) return;
+          if (tr.error) {
+            showApiErrorOnce(tr.message || tr.error);
+            await yieldToMain();
+            return;
+          }
+          if (!tr.translations || tr.translations.length !== job.words.length) {
+            showApiErrorOnce("Translation could not be applied. Try again.");
+            await yieldToMain();
+            return;
+          }
+          noteWordApiBackend(tr.backend);
+          try {
+            if (job.wrap && job.groups) {
+              updateGlossesInWrap(job.wrap, tr.translations);
+            } else {
+              updateGlossesInRoot(job.primary, tr.translations);
+            }
+          } catch (e) {
+            console.warn("[Verbatim]", e);
+          }
+          await yieldToMain();
+          return;
+        }
+
+        noteFirstWordApi();
+        const missing = job.missingIdx.map((i) => job.words[i]);
+        /** @type {string[]} */
+        const apiFlat = [];
+        let chunkFailed = false;
+        for (let i = 0; i < missing.length; i += TRANSLATE_CHUNK_WORDS) {
+          const chunk = missing.slice(i, i + TRANSLATE_CHUNK_WORDS);
+          const tr = await sendTranslate(chunk, sourceLang, targetLang);
+          if (abortWholePass) return;
+          if (tr.error) {
+            showApiErrorOnce(tr.message || tr.error);
+            chunkFailed = true;
+            break;
+          }
+          if (!tr.translations || tr.translations.length !== chunk.length) {
+            showApiErrorOnce("Translation could not be applied. Try again.");
+            chunkFailed = true;
+            break;
+          }
+          noteWordApiBackend(tr.backend);
+          apiFlat.push(...tr.translations);
+        }
+        if (chunkFailed) {
+          await yieldToMain();
+          return;
+        }
+
+        const fullGlosses = job.words.map((_, i) => {
+          const g = job.probes[i];
+          return g != null ? String(g) : "";
+        });
+        for (let j = 0; j < job.missingIdx.length; j++) {
+          fullGlosses[job.missingIdx[j]] = apiFlat[j];
+        }
+
+        try {
+          if (job.rootRef.hasAttribute("data-vit-wrap")) {
+            updateGlossesInWrap(job.rootRef, fullGlosses);
+          } else {
+            updateGlossesInRoot(job.rootRef, fullGlosses);
+          }
+        } catch (e) {
+          console.warn("[Verbatim]", e);
+        }
+        await yieldToMain();
+      }
+
+      function enqueueWordApi(job) {
+        deferredWordApi.push(job);
+        wordApiPromises.push(
+          processDeferredWordJob(job).catch((e) => {
+            console.warn("[Verbatim]", e);
+          })
+        );
+      }
+
       /** Segments where every word gloss was already in the extension cache. */
       let segmentsAllCacheHits = 0;
 
@@ -691,6 +886,7 @@ function translateWholePage(options = {}) {
         } else {
           const t = probe.translations;
           if (!Array.isArray(t) || t.length !== words.length) {
+            abortWholePass = true;
             return { ok: false, error: "translation_mismatch" };
           }
           probes = t;
@@ -735,7 +931,7 @@ function translateWholePage(options = {}) {
               seg.originalText,
               null
             );
-            deferredWordApi.push({ kind: "all_miss", primary, wrap, groups, words });
+            enqueueWordApi({ kind: "all_miss", primary, wrap, groups, words });
             if (wrap && groups) {
               scheduleFullLinesForWrap(wrap, groups, scheduleFullLineDeferred);
             } else {
@@ -761,7 +957,7 @@ function translateWholePage(options = {}) {
             null
           );
           rootRef = wrap || primary;
-          deferredWordApi.push({
+          enqueueWordApi({
             kind: "partial",
             rootRef: /** @type {HTMLElement} */ (rootRef),
             words,
@@ -785,101 +981,9 @@ function translateWholePage(options = {}) {
         pageTranslationEnabled = true;
       }
 
-      let apiErrorToastShown = false;
-      /** First successful word-level API response reports which backend responded. */
-      let wordApiBackendReported = false;
-      function showApiErrorOnce(message) {
-        if (apiErrorToastShown) return;
-        apiErrorToastShown = true;
-        const m =
-          message ||
-          "Could not reach the translation API. Cached glosses stay visible; try again later.";
-        setTranslationStatus("api_words", m);
-        showToast(m);
-      }
-
-      function noteWordApiBackend(backend) {
-        if (wordApiBackendReported || !backend) return;
-        const name = friendlyBackendName(backend);
-        if (!name) return;
-        wordApiBackendReported = true;
-        setTranslationStatus("api_words", `Translation API (${name}): missing word glosses`);
-      }
-
-      /* —— Phase 2: word-level API for misses (non-fatal) —— */
-      if (deferredWordApi.length) {
-        setTranslationStatus("api_words", "Translation API — missing word glosses (LibreTranslate).");
-      }
-      for (const job of deferredWordApi) {
-        if (job.kind === "all_miss") {
-          const tr = await sendTranslateWordsInChunks(job.words, sourceLang, targetLang);
-          if (tr.error) {
-            showApiErrorOnce(tr.message || tr.error);
-            await yieldToMain();
-            continue;
-          }
-          if (!tr.translations || tr.translations.length !== job.words.length) {
-            showApiErrorOnce("Translation could not be applied. Try again.");
-            await yieldToMain();
-            continue;
-          }
-          noteWordApiBackend(tr.backend);
-          try {
-            if (job.wrap && job.groups) {
-              updateGlossesInWrap(job.wrap, tr.translations);
-            } else {
-              updateGlossesInRoot(job.primary, tr.translations);
-            }
-          } catch (e) {
-            console.warn("[Verbatim]", e);
-          }
-          await yieldToMain();
-          continue;
-        }
-
-        const missing = job.missingIdx.map((i) => job.words[i]);
-        /** @type {string[]} */
-        const apiFlat = [];
-        let chunkFailed = false;
-        for (let i = 0; i < missing.length; i += TRANSLATE_CHUNK_WORDS) {
-          const chunk = missing.slice(i, i + TRANSLATE_CHUNK_WORDS);
-          const tr = await sendTranslate(chunk, sourceLang, targetLang);
-          if (tr.error) {
-            showApiErrorOnce(tr.message || tr.error);
-            chunkFailed = true;
-            break;
-          }
-          if (!tr.translations || tr.translations.length !== chunk.length) {
-            showApiErrorOnce("Translation could not be applied. Try again.");
-            chunkFailed = true;
-            break;
-          }
-          noteWordApiBackend(tr.backend);
-          apiFlat.push(...tr.translations);
-        }
-        if (chunkFailed) {
-          await yieldToMain();
-          continue;
-        }
-
-        const fullGlosses = job.words.map((_, i) => {
-          const g = job.probes[i];
-          return g != null ? String(g) : "";
-        });
-        for (let j = 0; j < job.missingIdx.length; j++) {
-          fullGlosses[job.missingIdx[j]] = apiFlat[j];
-        }
-
-        try {
-          if (job.rootRef.hasAttribute("data-vit-wrap")) {
-            updateGlossesInWrap(job.rootRef, fullGlosses);
-          } else {
-            updateGlossesInRoot(job.rootRef, fullGlosses);
-          }
-        } catch (e) {
-          console.warn("[Verbatim]", e);
-        }
-        await yieldToMain();
+      /* —— Phase 2: await all in-flight word-level API (started during phase 1) —— */
+      if (wordApiPromises.length) {
+        await Promise.allSettled(wordApiPromises);
       }
 
       /* —— Phase 3: full-sentence lines (cache first, then API via translateWithCache) —— */
@@ -984,6 +1088,7 @@ async function setPageTranslationEnabled(enabled) {
         translationStatusPhase = "idle";
         translationStatusDetail = null;
         broadcastVitState();
+        persistGlobalPageTranslation(true);
         return { ok: true, enabled: true, already: true, loadSummary: lastLoadSummaryText };
       }
       const backendReady = await checkTranslationBackendConfigured();
@@ -1012,6 +1117,7 @@ async function setPageTranslationEnabled(enabled) {
           enabled: false,
         };
       }
+      persistGlobalPageTranslation(true);
       return {
         ok: true,
         enabled: true,
@@ -1021,6 +1127,7 @@ async function setPageTranslationEnabled(enabled) {
       };
     }
     restorePage();
+    persistGlobalPageTranslation(false);
     pageTranslationEnabled = false;
     translationStatusPhase = "idle";
     translationStatusDetail = null;
@@ -1039,7 +1146,13 @@ async function setPageTranslationEnabled(enabled) {
 
 async function togglePageTranslation() {
   const res = await setPageTranslationEnabled(!pageTranslationEnabled);
-  if (!res.ok && res.error === "no_target_language" && res.message) {
+  if (
+    !res.ok &&
+    res.message &&
+    (res.error === "no_target_language" ||
+      res.error === "no_page_lang" ||
+      res.error === "source_same_as_target")
+  ) {
     showToast(res.message);
   }
   return res;
@@ -1053,6 +1166,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true;
     }
     sendResponse({ words: splitWordsWhitespaceOnly(t), skipped: null });
+    return true;
+  }
+  if (msg?.type === "GET_HTML_LANG") {
+    const raw = document.documentElement.getAttribute("lang") || document.documentElement.lang || "";
+    sendResponse({ raw, primary: primaryLangFromHtmlLang(raw) });
     return true;
   }
   if (msg?.type === "GET_PAGE_TRANSLATION_STATE") {
@@ -1076,4 +1194,29 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   return undefined;
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "sync" || !changes.globalPageTranslation) return;
+  const nv = changes.globalPageTranslation.newValue === true;
+  if (!nv) {
+    if (pageTranslationEnabled) {
+      restorePage();
+      pageTranslationEnabled = false;
+      translationStatusPhase = "idle";
+      translationStatusDetail = null;
+      lastLoadSummaryText = null;
+      broadcastVitState();
+    }
+    return;
+  }
+  if (!pageTranslationEnabled && !translationInProgress) {
+    void setPageTranslationEnabled(true);
+  }
+});
+
+void chrome.storage.sync.get(["globalPageTranslation"], (s) => {
+  if (s?.globalPageTranslation !== true) return;
+  if (pageTranslationEnabled || translationInProgress) return;
+  void setPageTranslationEnabled(true);
 });
