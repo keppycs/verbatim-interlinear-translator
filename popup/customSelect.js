@@ -61,16 +61,18 @@ export function mountCustomSelect(selectEl) {
       const selected = selectEl.selectedIndex === i;
       li.setAttribute("aria-selected", String(selected));
       li.classList.toggle("is-selected", selected);
-      li.addEventListener("mousedown", (e) => {
+      li.addEventListener("click", (e) => {
         e.preventDefault();
-      });
-      li.addEventListener("click", () => {
+        e.stopPropagation();
         if (selectEl.selectedIndex !== i) {
           selectEl.selectedIndex = i;
           selectEl.dispatchEvent(new Event("change", { bubbles: true }));
         }
         close();
         sync();
+        if (!trigger.disabled) {
+          trigger.focus({ preventScroll: true });
+        }
       });
       list.appendChild(li);
     }
@@ -78,7 +80,7 @@ export function mountCustomSelect(selectEl) {
 
   function sync() {
     const opt = selectEl.options[selectEl.selectedIndex];
-    valueSpan.textContent = opt ? opt.textContent : "—";
+    valueSpan.textContent = opt ? opt.textContent : "-";
     trigger.disabled = selectEl.disabled;
     close();
     renderList();

@@ -5,7 +5,7 @@ import { isLegacyCompat } from "../lib/compat.js";
 import { ensureVitContentScript } from "../lib/ensureVitContentScript.js";
 import { mountCustomSelect } from "./customSelect.js";
 
-/** Browsers without `chrome.storage.session` — translation cache is forced off in the service worker. */
+/** Browsers without `chrome.storage.session` - translation cache is forced off in the service worker. */
 const legacyMode = isLegacyCompat();
 
 const subEl = document.getElementById("toggleSub");
@@ -57,7 +57,7 @@ let baseUrlDebounceTimer = null;
 
 /**
  * Injected when `tabs.sendMessage` fails (content script not ready / no receiver).
- * Must be self-contained — serialized into the tab by `scripting.executeScript`.
+ * Must be self-contained - serialized into the tab by `scripting.executeScript`.
  * Keep in sync with `showToast` in content/content.js (enter → timer → exit).
  * @param {string} toastText
  */
@@ -403,7 +403,7 @@ function setSubtext(enabled) {
 
 /**
  * Match a LibreTranslate `/languages` row by code (handles zh vs zh-CN style mismatches).
- * Prefer exact `row.code` first — otherwise `zh` can win before `zh-CN` and you get the wrong `targets` list.
+ * Prefer exact `row.code` first - otherwise `zh` can win before `zh-CN` and you get the wrong `targets` list.
  * @param {Array<{ code: string; name: string; targets: string[] }>} languages
  * @param {string} code
  */
@@ -527,7 +527,7 @@ async function getHtmlLangPrimaryForActiveTab() {
 /**
  * Label Auto using the active tab’s &lt;html lang&gt; and Libre or Intl names.
  * Uses the same rule as fixed source options: if Libre lists no non-self targets for that code,
- * the resolved “Auto” source cannot translate — show that explicitly instead of “Auto (Italian)”.
+ * the resolved “Auto” source cannot translate - show that explicitly instead of “Auto (Italian)”.
  * @param {string | null | undefined} [htmlPrimaryHint] - when passed (including null), avoids GET_HTML_LANG
  */
 async function refreshAutoSourceLabel(htmlPrimaryHint) {

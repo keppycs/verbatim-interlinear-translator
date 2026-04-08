@@ -17,7 +17,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Verbatim Interlinear — toggle whole-page translation",
+    "default_title": "Verbatim Interlinear - toggle whole-page translation",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "logo.png",

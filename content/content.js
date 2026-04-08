@@ -1,5 +1,5 @@
 /**
- * Mirrors `lib/translation/libreStyleLang.js` — content scripts stay non-module for broad browser support.
+ * Mirrors `lib/translation/libreStyleLang.js` - content scripts stay non-module for broad browser support.
  * @param {string} code
  * @returns {string}
  */
@@ -258,7 +258,7 @@ function scheduleFullLinesForWrap(wrap, groups, scheduleFullLine) {
 }
 
 /**
- * Unbroken CJK/Kana/Hangul without spaces — needs a future segmenter.
+ * Unbroken CJK/Kana/Hangul without spaces - needs a future segmenter.
  * @param {string} text
  */
 function shouldSkipForSegmenter(text) {
@@ -275,7 +275,7 @@ let pageTranslationEnabled = false;
 let translationInProgress = false;
 
 /**
- * Cache vs API phase — mirrored to the toolbar popup while loading.
+ * Cache vs API phase - mirrored to the toolbar popup while loading.
  * @type {"idle" | "cache" | "api_words" | "api_sentences"}
  */
 let translationStatusPhase = "idle";
@@ -638,7 +638,7 @@ function startObserveNewContent() {
 /**
  * Walk the DOM for plain text not yet wrapped in interlinear spans, translate, and replace.
  * Phase 1: cache probe + mount per segment (cached glosses and … for misses).
- * Phase 2: API for cache misses runs in parallel with phase 1 — each segment’s missing words
+ * Phase 2: API for cache misses runs in parallel with phase 1 - each segment’s missing words
  * translate as soon as that segment’s cache probe finishes (not after the full-page cache scan).
  * Full-sentence lines run after all word-level work so glosses are applied first.
  * @param {{ activatingFirst?: boolean }} [options] - First enable: set pageTranslationEnabled after phase 1 so the popup stays on if the API fails later.
@@ -745,7 +745,7 @@ function translateWholePage(options = {}) {
 
       /** Segments where every word gloss was already in the extension cache. */
       let segmentsAllCacheHits = 0;
-      /** Word-level API calls only — for end-of-run stats. */
+      /** Word-level API calls only - for end-of-run stats. */
       let missingWordsTotal = 0;
 
       let apiErrorToastShown = false;
@@ -780,7 +780,7 @@ function translateWholePage(options = {}) {
           firstWordApiStatusSent = true;
           setTranslationStatus(
             "api_words",
-            "Translation API — missing word glosses (LibreTranslate).",
+            "Translation API - missing word glosses (LibreTranslate).",
           );
         }
       }
@@ -876,7 +876,7 @@ function translateWholePage(options = {}) {
         );
       }
 
-      /* —— Phase 1: cache only (mount UI; defer API) —— */
+      /* -- Phase 1: cache only (mount UI; defer API) -- */
       for (const seg of segments) {
         const words = seg.words;
         totalWords += words.length;
@@ -985,12 +985,12 @@ function translateWholePage(options = {}) {
         pageTranslationEnabled = true;
       }
 
-      /* —— Phase 2: await all in-flight word-level API (started during phase 1) —— */
+      /* -- Phase 2: await all in-flight word-level API (started during phase 1) -- */
       if (wordApiPromises.length) {
         await Promise.allSettled(wordApiPromises);
       }
 
-      /* —— Phase 3: full-sentence lines (cache first, then API via translateWithCache) —— */
+      /* -- Phase 3: full-sentence lines (cache first, then API via translateWithCache) -- */
       if (pendingFullLineSchedulers.length) {
         setTranslationStatus(
           "api_sentences",
@@ -1071,7 +1071,11 @@ function vitToastAttachHover(shell, bar, barAnim, root, opts) {
     stopIdle();
     if (reduced) {
       idleAnim = bar.animate(
-        [{ boxShadow: "0 0 8px rgba(255,153,51,0.35)" }, { boxShadow: "0 0 18px rgba(255,153,51,0.75)" }, { boxShadow: "0 0 8px rgba(255,153,51,0.35)" }],
+        [
+          { boxShadow: "0 0 8px rgba(255,153,51,0.35)" },
+          { boxShadow: "0 0 18px rgba(255,153,51,0.75)" },
+          { boxShadow: "0 0 8px rgba(255,153,51,0.35)" },
+        ],
         { duration: 1600, iterations: Infinity, easing: "ease-in-out" },
       );
     } else {
@@ -1182,10 +1186,11 @@ function showToast(message) {
     if (reduced) {
       shell.style.opacity = "1";
       bar.style.opacity = "0.85";
-      const barAnim = bar.animate(
-        [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
-        { duration: VIT_TOAST_PROGRESS_MS, easing: "linear", fill: "forwards" },
-      );
+      const barAnim = bar.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], {
+        duration: VIT_TOAST_PROGRESS_MS,
+        easing: "linear",
+        fill: "forwards",
+      });
       /** @type {any} */ (root)._vitAnim = barAnim;
       vitToastAttachHover(shell, bar, barAnim, root, { reduced: true });
       void barAnim.finished
@@ -1230,10 +1235,11 @@ function showToast(message) {
 
     void enter.finished
       .then(() => {
-        const barAnim = bar.animate(
-          [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
-          { duration: VIT_TOAST_PROGRESS_MS, easing: "linear", fill: "forwards" },
-        );
+        const barAnim = bar.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], {
+          duration: VIT_TOAST_PROGRESS_MS,
+          easing: "linear",
+          fill: "forwards",
+        });
         /** @type {any} */ (root)._vitAnim = barAnim;
         vitToastAttachHover(shell, bar, barAnim, root, { reduced: false });
         return barAnim.finished;
@@ -1268,7 +1274,10 @@ function showToast(message) {
       .then(finishHide)
       .catch(() => {});
   } catch {
-    /** @type {any} */ (root)._vitHide = setTimeout(finishHide, VIT_TOAST_ENTER_MS + VIT_TOAST_PROGRESS_MS + VIT_TOAST_EXIT_MS);
+    /** @type {any} */ (root)._vitHide = setTimeout(
+      finishHide,
+      VIT_TOAST_ENTER_MS + VIT_TOAST_PROGRESS_MS + VIT_TOAST_EXIT_MS,
+    );
   }
 }
 

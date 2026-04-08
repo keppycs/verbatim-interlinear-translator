@@ -31,7 +31,7 @@
                 aria-controls="sourceLangListbox"
                 disabled
               >
-                <span class="custom-select-value">—</span>
+                <span class="custom-select-value">-</span>
                 <span class="custom-select-chevron" aria-hidden="true"></span>
               </button>
               <div class="custom-select-dropdown" id="sourceLangDropdown" hidden>
@@ -64,7 +64,7 @@
                 aria-controls="targetLangListbox"
                 disabled
               >
-                <span class="custom-select-value">—</span>
+                <span class="custom-select-value">-</span>
                 <span class="custom-select-chevron" aria-hidden="true"></span>
               </button>
               <div class="custom-select-dropdown" id="targetLangDropdown" hidden>
@@ -141,7 +141,10 @@
               <span class="slider"></span>
             </label>
           </div>
-          <p class="toggle-panel-status" id="toggleSub">Translation off</p>
+          <div class="row row--toggle-line row--toggle-status" role="group" aria-label="Translation status and cache">
+            <p class="toggle-panel-status" id="toggleSub">Translation off</p>
+            <button type="button" class="btn-clear-cache" id="clearTranslationCache">Clear cache</button>
+          </div>
         </div>
 
         <label class="lang-field lang-field--full">
@@ -158,13 +161,10 @@
 
         <p id="legacyCacheHint" class="cache-legacy-hint" role="note" hidden></p>
 
-        <div class="row row--kbd-cache" role="group" aria-label="Keyboard shortcut and cache">
+        <div class="row row--kbd" role="group" aria-label="Keyboard shortcut">
           <p class="hint-kbd">
             Shortcut: <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd>
           </p>
-          <button type="button" class="btn-clear-cache" id="clearTranslationCache">
-            Clear cache
-          </button>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-/* Toolbar popup — layout (tokens & motion in ../shared/theme.css) */
+/* Toolbar popup - layout (tokens & motion in ../shared/theme.css) */
 
 *,
 *::before,
@@ -122,7 +122,7 @@ body.vit-ui.vit-popup {
     0 0 0 1px rgba(255, 153, 51, 0.1);
 }
 
-/* Language selects — roomy tap targets; native dropdown list inherits font sizing */
+/* Language selects - roomy tap targets; native dropdown list inherits font sizing */
 .lang-field--full {
   margin: 0;
 }
@@ -209,39 +209,30 @@ body.vit-ui.vit-popup {
   justify-content: flex-start;
 }
 
-.row--kbd-cache {
+.row--kbd {
   margin-top: 2px;
   padding-top: 2px;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
   flex-wrap: nowrap;
 }
 
-.row--kbd-cache .hint-kbd {
-  flex: 1 1 0;
+.row--kbd .hint-kbd {
+  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   padding: 0;
   text-align: left;
-  font-size: 10px;
+  font-size: 15px;
   line-height: 1.35;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
-.row--kbd-cache .hint-kbd kbd {
-  font-size: 9px;
-  padding: 0.1rem 0.28rem;
+.row--kbd .hint-kbd kbd {
+  font-size: 14px;
+  padding: 0.14rem 0.36rem;
   border-radius: 4px;
-}
-
-.row--kbd-cache .btn-clear-cache {
-  flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 650;
-  padding: 0.2rem 0.5rem;
-  line-height: 1.25;
 }
 
 .btn-clear-cache {
@@ -290,7 +281,7 @@ body.vit-ui.vit-popup {
   color: rgba(255, 176, 110, 0.9);
 }
 
-/* Hidden native <select> — logic only; the visible control is .custom-select-trigger */
+/* Hidden native <select> - logic only; the visible control is .custom-select-trigger */
 body.vit-ui.vit-popup select.lang-select-native {
   position: absolute;
   left: 0;
@@ -405,7 +396,7 @@ body.vit-ui.vit-popup select.lang-select-native {
 .custom-select-options {
   list-style: none;
   margin: 0;
-  /* Symmetric inset; avoid scrollbar-gutter — it reserves a blank strip that looks like a gap */
+  /* Symmetric inset; avoid scrollbar-gutter - it reserves a blank strip that looks like a gap */
   padding: 5px;
   max-height: min(240px, 42vh);
   overflow-y: auto;
@@ -440,6 +431,7 @@ body.vit-ui.vit-popup select.lang-select-native {
   line-height: 1.45;
   cursor: pointer;
   color: var(--vit-text);
+  user-select: none;
   border-radius: var(--vit-radius-sm);
   transition:
     background var(--vit-duration) var(--vit-ease),
@@ -493,6 +485,25 @@ body.vit-ui.vit-popup select.lang-select-native {
   margin-top: 10px;
 }
 
+.row--toggle-status {
+  align-items: center;
+  gap: 12px;
+}
+
+.row--toggle-status .toggle-panel-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.row--toggle-status .btn-clear-cache {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 650;
+  padding: 0.2rem 0.5rem;
+  line-height: 1.25;
+}
+
 .toggle-line-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -515,7 +526,7 @@ body.vit-ui.vit-popup select.lang-select-native {
 }
 
 .toggle-panel-status {
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
   font-size: 13px;
   line-height: 1.4;
