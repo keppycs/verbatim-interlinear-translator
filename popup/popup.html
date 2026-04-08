@@ -17,16 +17,42 @@
       </div>
 
       <div class="card">
-        <div class="lang-fields" role="group" aria-label="Translation languages">
+        <label class="lang-field lang-field--full">
+          <span class="lang-field-label">LibreTranslate URL</span>
+          <input
+            type="url"
+            id="libreTranslateBaseUrl"
+            class="lang-input"
+            placeholder="https://libretranslate.com"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+
+        <p id="languagesError" class="popup-error popup-error--inline" role="alert" hidden></p>
+
+        <div class="lang-fields lang-fields--swap" role="group" aria-label="Translation languages">
           <label class="lang-field">
             <span class="lang-field-label">Source language</span>
-            <select id="sourceLang" class="lang-select" title="Language of the page text"></select>
+            <select id="sourceLang" class="lang-select" title="Language of the page text" disabled></select>
           </label>
+          <button type="button" class="btn-swap" id="swapLang" aria-label="Swap source and target languages" title="Swap languages" disabled>
+            <span aria-hidden="true">⇄</span>
+          </button>
           <label class="lang-field">
             <span class="lang-field-label">Target language</span>
-            <select id="targetLang" class="lang-select" title="Language to translate into"></select>
+            <select id="targetLang" class="lang-select" title="Language to translate into" disabled></select>
           </label>
         </div>
+
+        <div class="row row--cache">
+          <label class="row-cache-label">
+            <input type="checkbox" id="useTranslationCache" checked />
+            <span>Use translation cache</span>
+          </label>
+          <button type="button" class="btn-clear-cache" id="clearTranslationCache">Clear cache</button>
+        </div>
+        <p id="cacheStatus" class="cache-status" role="status" aria-live="polite" hidden></p>
 
         <div
           class="row row--toggle"
@@ -54,9 +80,6 @@
 
         <p id="popupError" class="popup-error" role="alert" hidden></p>
 
-        <div class="footer">
-          <a class="link-options" id="openOptions" href="#">Options &amp; API keys</a>
-        </div>
         <p class="hint-kbd">Shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> · Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd></p>
       </div>
     </div>

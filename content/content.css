@@ -69,8 +69,7 @@
 }
 
 /* Interlinear columns: source (original) on top, gloss directly underneath */
-[data-vit-root][data-vit-layout="inject"] .vit-word,
-[data-vit-root][data-vit-layout="absolute"] .vit-word {
+[data-vit-root][data-vit-layout="inject"] .vit-word {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -79,21 +78,18 @@
   margin-bottom: 0.35em;
 }
 
-[data-vit-root][data-vit-layout="inject"] .vit-word:last-child,
-[data-vit-root][data-vit-layout="absolute"] .vit-word:last-child {
+[data-vit-root][data-vit-layout="inject"] .vit-word:last-child {
   margin-right: 0;
 }
 
-[data-vit-root][data-vit-layout="inject"] .vit-source,
-[data-vit-root][data-vit-layout="absolute"] .vit-source {
+[data-vit-root][data-vit-layout="inject"] .vit-source {
   display: inline-block;
   font-size: 1em;
   line-height: 1.4;
   opacity: 0.98;
 }
 
-[data-vit-root][data-vit-layout="inject"] .vit-gloss,
-[data-vit-root][data-vit-layout="absolute"] .vit-gloss {
+[data-vit-root][data-vit-layout="inject"] .vit-gloss {
   display: block;
   font-size: var(--vit-translation-size);
   line-height: 1.28;

@@ -79,11 +79,133 @@ body.vit-ui.vit-popup {
 }
 
 /* Language selects — roomy tap targets; native dropdown list inherits font sizing */
+.lang-field--full {
+  margin-bottom: 12px;
+}
+
+.lang-input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 14px;
+  line-height: 1.45;
+  border-radius: var(--vit-radius);
+  border: 1px solid var(--vit-border);
+  background: var(--vit-bg);
+  color: var(--vit-text);
+}
+
+.lang-input:focus {
+  outline: none;
+  border-color: rgba(255, 153, 51, 0.55);
+  box-shadow: 0 0 0 2px rgba(255, 153, 51, 0.15);
+}
+
+.popup-error--inline {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.popup-error--inline[hidden] {
+  display: none !important;
+}
+
 .lang-fields {
   display: flex;
   flex-direction: column;
   gap: 14px;
   margin-bottom: 18px;
+}
+
+.lang-fields--swap {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: end;
+  gap: 10px 8px;
+}
+
+.lang-fields--swap .lang-field {
+  min-width: 0;
+}
+
+.btn-swap {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.75rem;
+  margin-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  line-height: 1;
+  border-radius: var(--vit-radius);
+  border: 1px solid rgba(255, 153, 51, 0.35);
+  background: rgba(255, 153, 51, 0.08);
+  color: var(--vit-text);
+  cursor: pointer;
+  transition:
+    background var(--vit-duration) var(--vit-ease),
+    border-color var(--vit-duration) var(--vit-ease);
+}
+
+.btn-swap:hover:not(:disabled) {
+  background: rgba(255, 153, 51, 0.14);
+  border-color: rgba(255, 153, 51, 0.5);
+}
+
+.btn-swap:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.row--cache {
+  margin-bottom: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.row-cache-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--vit-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.row-cache-label input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--vit-accent);
+}
+
+.btn-clear-cache {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--vit-radius);
+  border: 1px solid rgba(255, 153, 51, 0.35);
+  background: transparent;
+  color: var(--vit-muted);
+  cursor: pointer;
+}
+
+.btn-clear-cache:hover:not(:disabled) {
+  color: var(--vit-text);
+  border-color: rgba(255, 153, 51, 0.5);
+}
+
+.cache-status {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--vit-muted);
+}
+
+.cache-status[hidden] {
+  display: none !important;
 }
 
 .lang-field {

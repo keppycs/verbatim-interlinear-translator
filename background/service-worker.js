@@ -1,9 +1,25 @@
-import { translateWithCache, probeCacheOnly, translateWithoutCache } from "../lib/translation/cache.js";
+import {
+  translateWithCache,
+  probeCacheOnly,
+  translateWithoutCache,
+  clearTranslationCache,
+} from "../lib/translation/cache.js";
 import { hasConfiguredTranslationBackend } from "../lib/translation/resolve.js";
 import { defaultSettings } from "../lib/defaultSettings.js";
+import { normalizeHttpServiceBaseUrl } from "../lib/translation/normalizeServiceUrl.js";
+import { fetchLibreLanguages } from "../lib/translation/fetchLibreLanguages.js";
 
 function mergeSettings(stored) {
   return { ...defaultSettings, ...stored };
+}
+
+/** @type {{ key: string, languages: unknown[] | null }} */
+let libreLanguagesMemCache = { key: "", languages: null };
+
+function libreBaseKey(url) {
+  const t = typeof url === "string" ? url.trim() : "";
+  if (!t) return "";
+  return normalizeHttpServiceBaseUrl(t).replace(/\/$/, "");
 }
 
 function ensureContextMenu() {
@@ -70,11 +86,52 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return;
   }
+
+  if (msg?.type === "GET_LIBRE_LANGUAGES") {
+    (async () => {
+      try {
+        const rawUrl = typeof msg.baseUrl === "string" ? msg.baseUrl : "";
+        const key = libreBaseKey(rawUrl);
+        if (!key) {
+          sendResponse({ ok: false, error: "Missing LibreTranslate URL." });
+          return;
+        }
+        if (libreLanguagesMemCache.key === key && libreLanguagesMemCache.languages) {
+          sendResponse({ ok: true, languages: libreLanguagesMemCache.languages });
+          return;
+        }
+        const languages = await fetchLibreLanguages(rawUrl);
+        libreLanguagesMemCache = { key, languages };
+        sendResponse({ ok: true, languages });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+    return true;
+  }
+
+  if (msg?.type === "CLEAR_TRANSLATION_CACHE") {
+    void (async () => {
+      try {
+        await clearTranslationCache();
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+    return true;
+  }
+
   if (msg?.type === "TRANSLATE_CACHE_PROBE") {
     (async () => {
       try {
         const stored = await chrome.storage.sync.get(null);
         const settings = mergeSettings(stored);
+        if (settings.useTranslationCache === false) {
+          const texts = msg.texts || [];
+          sendResponse({ translations: texts.map(() => null) });
+          return;
+        }
         const sourceLang = msg.sourceLang ?? settings.sourceLang;
         const targetLang = String(msg.targetLang ?? settings.targetLang ?? "").trim();
         if (!targetLang) {

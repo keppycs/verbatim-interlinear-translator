@@ -127,10 +127,9 @@ function groupTextNodesByBlock(textNodes) {
  * @param {string[]} words
  * @param {(string|null)[]} glosses
  * @param {string} fullOriginalForRestore
- * @param {"inject"|"absolute"} layoutMode
  * @param {string|null} fullTranslation
  */
-function buildMultilineWrap(middle, words, glosses, fullOriginalForRestore, layoutMode, fullTranslation) {
+function buildMultilineWrap(middle, words, glosses, fullOriginalForRestore, fullTranslation) {
   const groups = splitWordsIntoLines(middle, words);
   const wrap = document.createElement("span");
   wrap.setAttribute("data-vit-wrap", "1");
@@ -150,7 +149,7 @@ function buildMultilineWrap(middle, words, glosses, fullOriginalForRestore, layo
     }
     const glossSlice = glosses.slice(g.glossSliceStart, g.glossSliceStart + g.glossSliceLen);
     const lineForFull = g.lineText.trim();
-    const root = buildInterlinearFragment(g.words, glossSlice, lineForFull, layoutMode, fullTranslation);
+    const root = buildInterlinearFragment(g.words, glossSlice, lineForFull, fullTranslation);
     wrap.appendChild(root);
   }
   return { wrap, groups };
@@ -163,11 +162,10 @@ function buildMultilineWrap(middle, words, glosses, fullOriginalForRestore, layo
  * @param {string[]} words
  * @param {(string|null)[]} glosses
  * @param {string} originalText
- * @param {"inject"|"absolute"} layoutMode
  * @param {string|null} fullTranslation
  * @returns {{ primary: HTMLElement, wrap: HTMLElement | null, groups: ReturnType<typeof splitWordsIntoLines> | null }}
  */
-function mountInterlinearReplacement(textNodes, words, glosses, originalText, layoutMode, fullTranslation) {
+function mountInterlinearReplacement(textNodes, words, glosses, originalText, fullTranslation) {
   if (!textNodes.length) {
     throw new Error("mountInterlinearReplacement: empty textNodes");
   }
@@ -180,7 +178,7 @@ function mountInterlinearReplacement(textNodes, words, glosses, originalText, la
   const multiline = /\r|\n/.test(middle);
   const frag = document.createDocumentFragment();
   if (!multiline) {
-    const root = buildInterlinearFragment(words, glosses, originalText, layoutMode, fullTranslation);
+    const root = buildInterlinearFragment(words, glosses, originalText, fullTranslation);
     if (leading) frag.appendChild(document.createTextNode(leading));
     frag.appendChild(root);
     if (trailing) frag.appendChild(document.createTextNode(trailing));
@@ -188,7 +186,7 @@ function mountInterlinearReplacement(textNodes, words, glosses, originalText, la
     range.insertNode(frag);
     return { primary: root, wrap: null, groups: null };
   }
-  const { wrap, groups } = buildMultilineWrap(middle, words, glosses, originalText, layoutMode, fullTranslation);
+  const { wrap, groups } = buildMultilineWrap(middle, words, glosses, originalText, fullTranslation);
   if (leading) frag.appendChild(document.createTextNode(leading));
   frag.appendChild(wrap);
   if (trailing) frag.appendChild(document.createTextNode(trailing));
@@ -269,8 +267,7 @@ const TRANSLATE_CHUNK_WORDS = 80;
 
 const MUTATION_DEBOUNCE_MS = 450;
 
-const NO_BACKEND_MESSAGE =
-  "Add at least one translation API in Options — use “Options & API keys” in this menu.";
+const NO_BACKEND_MESSAGE = "Set your LibreTranslate URL in the extension menu.";
 
 function storageGet() {
   return new Promise((resolve) => {
@@ -310,14 +307,13 @@ function yieldToMain() {
  * @param {string[]} words
  * @param {(string|null)[]} glosses - null = pending (shows … until filled)
  * @param {string} originalText
- * @param {"inject"|"absolute"} layoutMode
  * @param {string|null} fullTranslation - null = omit full-sentence line until `updateFullLineInRoot`; ignored when single-word
  */
-function buildInterlinearFragment(words, glosses, originalText, layoutMode, fullTranslation) {
+function buildInterlinearFragment(words, glosses, originalText, fullTranslation) {
   const root = document.createElement("span");
   root.setAttribute("data-vit-root", "1");
   root.setAttribute("data-vit-original-text", originalText);
-  root.setAttribute("data-vit-layout", layoutMode === "absolute" ? "absolute" : "inject");
+  root.setAttribute("data-vit-layout", "inject");
   root.className = "vit-root";
 
   const multiWord = words.length > 1;
@@ -421,7 +417,7 @@ function formatLoadSummaryText(s) {
   parts.push(`${s.segmentsAllCache} text segment(s) had every word gloss in the extension cache.`);
   if (s.wordSegmentsApi > 0) {
     parts.push(
-      `Missing glosses: ${s.missingWords} word(s) across ${s.wordSegmentsApi} segment(s) — requested via your Translation API options (auto chain or chosen backend).`
+      `Missing glosses: ${s.missingWords} word(s) across ${s.wordSegmentsApi} segment(s) — requested via LibreTranslate.`
     );
   } else {
     parts.push("Missing glosses: none — no word-level API calls.");
@@ -449,15 +445,8 @@ function setTranslationStatus(phase, detail = null) {
 /** @param {string} [id] */
 function friendlyBackendName(id) {
   if (!id || id === "cache" || id === "none") return null;
-  const m = {
-    deepl: "DeepL",
-    google: "Google Cloud Translation",
-    azure: "Azure Translator",
-    libretranslate: "LibreTranslate",
-    custom: "Custom endpoint",
-    ondevice: "On-device",
-  };
-  return m[id] || id;
+  if (id === "libretranslate") return "LibreTranslate";
+  return id;
 }
 
 function sendCacheProbe(texts, sourceLang, targetLang) {
@@ -626,7 +615,6 @@ function translateWholePage(options = {}) {
         };
       }
       const sourceLang = (stored.sourceLang || "auto").trim() || "auto";
-      const layoutMode = stored.layoutMode === "absolute" ? "absolute" : "inject";
 
       const textNodes = collectTextNodes();
       const segments = buildSegments(textNodes);
@@ -724,7 +712,6 @@ function translateWholePage(options = {}) {
               words,
               glosses,
               seg.originalText,
-              layoutMode,
               null
             );
             if (wrap && groups) {
@@ -746,7 +733,6 @@ function translateWholePage(options = {}) {
               words,
               words.map(() => null),
               seg.originalText,
-              layoutMode,
               null
             );
             deferredWordApi.push({ kind: "all_miss", primary, wrap, groups, words });
@@ -772,7 +758,6 @@ function translateWholePage(options = {}) {
             words,
             partialGlosses,
             seg.originalText,
-            layoutMode,
             null
           );
           rootRef = wrap || primary;
@@ -823,10 +808,7 @@ function translateWholePage(options = {}) {
 
       /* —— Phase 2: word-level API for misses (non-fatal) —— */
       if (deferredWordApi.length) {
-        setTranslationStatus(
-          "api_words",
-          "Translation API — missing word glosses (your backend / auto chain in Options)."
-        );
+        setTranslationStatus("api_words", "Translation API — missing word glosses (LibreTranslate).");
       }
       for (const job of deferredWordApi) {
         if (job.kind === "all_miss") {

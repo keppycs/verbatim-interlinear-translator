@@ -1,17 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Verbatim Interlinear Translator",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "description": "Word-by-word interlinear translation injected into page HTML.",
   "permissions": ["storage", "activeTab", "tabs", "contextMenus"],
-  "host_permissions": ["https://api-free.deepl.com/*", "https://api.deepl.com/*", "https://translation.googleapis.com/*", "https://*.googleapis.com/*", "https://api.cognitive.microsofttranslator.com/*", "http://*/*", "https://*/*"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
-  },
-  "options_ui": {
-    "page": "options/options.html",
-    "open_in_tab": true
   },
   "action": {
     "default_title": "Verbatim Interlinear — toggle whole-page translation",
