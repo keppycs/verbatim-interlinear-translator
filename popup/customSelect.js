@@ -53,6 +53,8 @@ export function mountCustomSelect(selectEl) {
     list.innerHTML = "";
     for (let i = 0; i < selectEl.options.length; i++) {
       const opt = selectEl.options[i];
+      /* Empty value = placeholder label only (shown on trigger); not a real choice in the list. */
+      if (opt.value === "") continue;
       const li = document.createElement("li");
       li.className = "custom-select-option";
       li.setAttribute("role", "option");

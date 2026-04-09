@@ -313,11 +313,18 @@ function primaryLangFromHtmlLang(raw) {
 
 /**
  * When the user picks "Auto", use only the document `<html lang="…">` (no API detection).
- * @param {string} storedSource - "auto" or an explicit language code
+ * @param {string} storedSource - "auto", an explicit language code, or empty when unset
  * @returns {{ ok: true, sourceLang: string } | { ok: false, error: string, message: string }}
  */
 function resolveAutoSourceToConcrete(storedSource) {
-  const src = (storedSource || "auto").trim() || "auto";
+  const src = (storedSource ?? "").trim();
+  if (!src) {
+    return {
+      ok: false,
+      error: "no_source_language",
+      message: "Choose a source language in the extension toolbar menu.",
+    };
+  }
   if (src !== "auto") {
     return { ok: true, sourceLang: src };
   }
@@ -667,7 +674,7 @@ function translateWholePage(options = {}) {
           message: "Choose a target language in the extension toolbar menu.",
         };
       }
-      const sourceLangSetting = (stored.sourceLang || "auto").trim() || "auto";
+      const sourceLangSetting = (stored.sourceLang ?? "").trim();
       const resolvedSource = resolveAutoSourceToConcrete(sourceLangSetting);
       if (!resolvedSource.ok) {
         return {
@@ -1369,6 +1376,7 @@ async function togglePageTranslation() {
     !res.ok &&
     res.message &&
     (res.error === "no_target_language" ||
+      res.error === "no_source_language" ||
       res.error === "no_page_lang" ||
       res.error === "source_same_as_target")
   ) {

@@ -19,8 +19,8 @@
 
       <div class="card">
         <div class="lang-fields" role="group" aria-label="Translation languages">
-          <label class="lang-field">
-            <span class="lang-field-label">Source language</span>
+          <div class="lang-field">
+            <span id="vitSourceLangLabel" class="lang-field-label">Source language</span>
             <div class="custom-select">
               <button
                 type="button"
@@ -29,6 +29,7 @@
                 aria-haspopup="listbox"
                 aria-expanded="false"
                 aria-controls="sourceLangListbox"
+                aria-labelledby="vitSourceLangLabel"
                 disabled
               >
                 <span class="custom-select-value">-</span>
@@ -39,7 +40,7 @@
                   class="custom-select-options"
                   id="sourceLangListbox"
                   role="listbox"
-                  aria-labelledby="sourceLangFace"
+                  aria-labelledby="vitSourceLangLabel"
                 ></ul>
               </div>
               <select
@@ -51,9 +52,9 @@
                 disabled
               ></select>
             </div>
-          </label>
-          <label class="lang-field">
-            <span class="lang-field-label">Target language</span>
+          </div>
+          <div class="lang-field">
+            <span id="vitTargetLangLabel" class="lang-field-label">Target language</span>
             <div class="custom-select">
               <button
                 type="button"
@@ -62,6 +63,7 @@
                 aria-haspopup="listbox"
                 aria-expanded="false"
                 aria-controls="targetLangListbox"
+                aria-labelledby="vitTargetLangLabel"
                 disabled
               >
                 <span class="custom-select-value">-</span>
@@ -72,7 +74,7 @@
                   class="custom-select-options"
                   id="targetLangListbox"
                   role="listbox"
-                  aria-labelledby="targetLangFace"
+                  aria-labelledby="vitTargetLangLabel"
                 ></ul>
               </div>
               <select
@@ -84,19 +86,19 @@
                 disabled
               ></select>
             </div>
-          </label>
+          </div>
         </div>
 
         <div class="row row--swap" role="group" aria-label="Swap languages">
           <button
             type="button"
-            class="btn-swap"
+            class="btn-toolbar-pill"
             id="swapLang"
             aria-label="Swap source and target languages"
             title="Swap source and target languages"
             disabled
           >
-            <span class="btn-swap-icon" aria-hidden="true">⇄</span>
+            <span class="btn-toolbar-pill__icon btn-toolbar-pill__icon--glyph" aria-hidden="true">⇄</span>
             <span>Switch languages</span>
           </button>
         </div>
@@ -143,22 +145,104 @@
           </div>
           <div class="row row--toggle-line row--toggle-status" role="group" aria-label="Translation status and cache">
             <p class="toggle-panel-status" id="toggleSub">Translation off</p>
-            <button type="button" class="btn-clear-cache" id="clearTranslationCache">Clear cache</button>
+            <button type="button" class="btn-toolbar-pill" id="clearTranslationCache">
+              <span class="btn-toolbar-pill__icon" aria-hidden="true">
+                <svg
+                  class="btn-toolbar-pill__svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M18 6h-1V5a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2v1H6a1 1 0 0 0 0 2h12a1 1 0 0 0 0-2z"
+                    fill="currentColor"
+                    opacity="0.92"
+                  />
+                  <path
+                    d="M8 9v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9"
+                    stroke="currentColor"
+                    stroke-width="1.35"
+                  />
+                  <path
+                    d="M10 12.5v5M14 12.5v5"
+                    stroke="currentColor"
+                    stroke-width="1.35"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M18.5 4.5l.35 1.05 1.1.35-1.1.35L18.5 7l-.35-1.05-1.1-.35 1.1-.35.35-1.05z"
+                    fill="currentColor"
+                    opacity="0.65"
+                  />
+                  <circle cx="20.2" cy="9.3" r="0.9" fill="currentColor" opacity="0.5" />
+                </svg>
+              </span>
+              <span>Clear cache</span>
+            </button>
           </div>
         </div>
 
-        <label class="lang-field lang-field--full">
-          <span class="lang-field-label">LibreTranslate URL</span>
-          <input
-            type="text"
-            id="libreTranslateBaseUrl"
-            class="lang-input"
-            placeholder="yourlibretranslatehost.com"
-            inputmode="url"
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </label>
+        <div class="lang-field lang-field--full">
+          <span id="libreUrlFieldLabel" class="lang-field-label">LibreTranslate URL</span>
+          <div class="lang-field-url-row">
+            <div class="lang-field-url-input-shell">
+              <input
+                type="text"
+                id="libreTranslateBaseUrl"
+                class="lang-input lang-input--url"
+                aria-labelledby="libreUrlFieldLabel"
+                placeholder="yourlibretranslatehost.com"
+                inputmode="url"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <button
+              type="button"
+              class="libre-url-test-btn"
+              id="libreUrlTestBtn"
+              aria-label="Test connection to LibreTranslate server"
+              title="Test connection"
+              data-state="idle"
+            >
+              <span class="libre-url-test-btn__layer libre-url-test-btn__idle" aria-hidden="true">
+                <svg class="libre-url-test-icon" width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <path
+                    stroke="currentColor"
+                    stroke-width="1.65"
+                    stroke-linecap="round"
+                    d="M5 12.55a11 11 0 0 1 14.08 0"
+                  />
+                  <path
+                    stroke="currentColor"
+                    stroke-width="1.65"
+                    stroke-linecap="round"
+                    opacity="0.55"
+                    d="M8.53 16.11a6 6 0 0 1 6.95 0"
+                  />
+                  <circle cx="12" cy="20" r="1.35" fill="currentColor" />
+                </svg>
+              </span>
+              <span class="libre-url-test-btn__layer libre-url-test-btn__loading" aria-hidden="true">
+                <span class="libre-url-test-spinner"></span>
+              </span>
+              <span class="libre-url-test-btn__layer libre-url-test-btn__success" aria-hidden="true">
+                <svg class="libre-url-test-check" width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <path
+                    class="libre-url-test-check__path"
+                    stroke="currentColor"
+                    stroke-width="2.25"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M6.5 12.5 10.2 16 18 8"
+                  />
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
 
         <p id="legacyCacheHint" class="cache-legacy-hint" role="note" hidden></p>
 

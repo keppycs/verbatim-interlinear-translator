@@ -12,7 +12,7 @@ body {
   padding: 0;
 }
 
-/* Max height matches Chrome’s extension popup limit; overflow-y allows scroll when layout regresses. */
+/* Chrome extension popup height is capped (~600px); layout is spaced to use that budget comfortably. */
 html {
   --vit-popup-max-height: 600px;
   max-height: var(--vit-popup-max-height);
@@ -39,7 +39,7 @@ body.vit-ui.vit-popup {
 .shell {
   flex: 0 1 auto;
   min-height: 0;
-  padding: 16px 20px 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   overflow: visible;
@@ -49,7 +49,7 @@ body.vit-ui.vit-popup {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
@@ -92,7 +92,7 @@ body.vit-ui.vit-popup {
   overflow: visible;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 13px;
   background: linear-gradient(
     165deg,
     rgba(255, 153, 51, 0.09) 0%,
@@ -101,7 +101,7 @@ body.vit-ui.vit-popup {
   );
   border: 1px solid var(--vit-border-accent);
   border-radius: var(--vit-radius-lg);
-  padding: 14px 18px 16px;
+  padding: 12px 18px 10px;
   box-shadow: var(--vit-shadow);
   transition:
     border-color var(--vit-duration) var(--vit-ease),
@@ -127,6 +127,222 @@ body.vit-ui.vit-popup {
   margin: 0;
 }
 
+/* Title line only as wide as the text (avoids a full-width invisible hit box above the field). */
+.lang-field--full > .lang-field-label {
+  width: fit-content;
+  max-width: 100%;
+  cursor: default;
+  user-select: none;
+}
+
+.lang-field-url-row {
+  --vit-libre-control-h: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+/* Wraps only the input so hover styles never fire from the title line (no <label for> hover quirks). */
+.lang-field-url-input-shell {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.lang-field-url-input-shell .lang-input.lang-input--url {
+  width: 100%;
+}
+
+.lang-field-url-input-shell:hover .lang-input.lang-input--url:not(:focus) {
+  border-color: rgba(255, 153, 51, 0.44);
+  background: rgba(255, 153, 51, 0.06);
+}
+
+.libre-url-test-btn:hover:not(:disabled)[data-state="idle"] {
+  border-color: rgba(255, 153, 51, 0.52);
+  background: rgba(255, 153, 51, 0.1);
+}
+
+.libre-url-test-btn {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--vit-libre-control-h, 2.75rem);
+  height: var(--vit-libre-control-h, 2.75rem);
+  min-width: var(--vit-libre-control-h, 2.75rem);
+  min-height: var(--vit-libre-control-h, 2.75rem);
+  max-width: var(--vit-libre-control-h, 2.75rem);
+  max-height: var(--vit-libre-control-h, 2.75rem);
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: var(--vit-radius);
+  border: 1px solid var(--vit-border-accent);
+  background: rgba(0, 0, 0, 0.32);
+  color: rgba(255, 176, 110, 0.95);
+  cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition:
+    border-color 0.22s var(--vit-ease),
+    background-color 0.22s var(--vit-ease),
+    box-shadow 0.22s var(--vit-ease);
+}
+
+.libre-url-test-btn:active:not(:disabled)[data-state="idle"] {
+  background: rgba(255, 153, 51, 0.12);
+  border-color: rgba(255, 153, 51, 0.55);
+}
+
+.libre-url-test-btn:focus-visible {
+  outline: 2px solid var(--vit-ring);
+  outline-offset: 2px;
+}
+
+.libre-url-test-btn:disabled {
+  cursor: wait;
+}
+
+.libre-url-test-btn[data-state="loading"] {
+  border-color: rgba(255, 153, 51, 0.42);
+  animation: vit-libre-pulse-border 1.1s ease-in-out infinite;
+}
+
+.libre-url-test-btn[data-state="success"] {
+  border-color: rgba(140, 215, 175, 0.55);
+  background: rgba(90, 180, 140, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(130, 210, 170, 0.2),
+    inset 0 1px 2px rgba(0, 0, 0, 0.28),
+    0 6px 20px rgba(100, 200, 150, 0.12);
+}
+
+.libre-url-test-btn[data-state="error"] {
+  animation: vit-libre-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.libre-url-test-btn__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 0.32s var(--vit-ease),
+    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+.libre-url-test-btn__idle {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.libre-url-test-btn__loading,
+.libre-url-test-btn__success {
+  opacity: 0;
+  transform: scale(0.72);
+}
+
+.libre-url-test-btn[data-state="loading"] .libre-url-test-btn__idle,
+.libre-url-test-btn[data-state="success"] .libre-url-test-btn__idle,
+.libre-url-test-btn[data-state="error"] .libre-url-test-btn__loading,
+.libre-url-test-btn[data-state="error"] .libre-url-test-btn__success {
+  opacity: 0;
+  transform: scale(0.72);
+}
+
+.libre-url-test-btn[data-state="loading"] .libre-url-test-btn__loading {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.libre-url-test-btn[data-state="success"] .libre-url-test-btn__success {
+  opacity: 1;
+  transform: scale(1);
+  animation: vit-libre-success-pop 0.58s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.libre-url-test-btn[data-state="error"] .libre-url-test-btn__idle {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.libre-url-test-spinner {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid rgba(255, 153, 51, 0.22);
+  border-top-color: var(--vit-accent);
+  border-radius: 50%;
+  animation: vit-spin 0.72s linear infinite;
+}
+
+.libre-url-test-check {
+  color: #b8edd0;
+  filter: drop-shadow(0 0 10px rgba(120, 220, 170, 0.45));
+}
+
+.libre-url-test-check__path {
+  stroke: currentColor;
+}
+
+/* Optical centering: wifi arcs read a little low in the square button */
+.libre-url-test-icon {
+  display: block;
+  transform: translateY(-3px);
+}
+
+@keyframes vit-libre-pulse-border {
+  0%,
+  100% {
+    border-color: rgba(255, 153, 51, 0.38);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    border-color: rgba(255, 153, 51, 0.58);
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.35),
+      0 0 0 2px rgba(255, 153, 51, 0.08);
+  }
+}
+
+@keyframes vit-libre-success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-18deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.12) rotate(6deg);
+  }
+  80% {
+    transform: scale(0.96) rotate(-2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes vit-libre-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-5px) rotate(-1deg);
+  }
+  30% {
+    transform: translateX(5px) rotate(1deg);
+  }
+  45% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(4px);
+  }
+}
+
 .lang-input {
   width: 100%;
   min-height: 2.45rem;
@@ -146,6 +362,18 @@ body.vit-ui.vit-popup {
   box-shadow: 0 0 0 2px rgba(255, 153, 51, 0.15);
 }
 
+/* After base .lang-input; height matches .libre-url-test-btn via --vit-libre-control-h on .lang-field-url-row */
+.lang-input.lang-input--url {
+  min-height: var(--vit-libre-control-h, 2.75rem);
+  height: var(--vit-libre-control-h, 2.75rem);
+  padding: 0 0.8rem;
+  box-sizing: border-box;
+  transition:
+    border-color 0.22s var(--vit-ease),
+    background-color 0.22s var(--vit-ease),
+    box-shadow 0.22s var(--vit-ease);
+}
+
 .lang-fields {
   display: flex;
   flex-direction: column;
@@ -157,56 +385,93 @@ body.vit-ui.vit-popup {
   min-width: 0;
 }
 
-.btn-swap {
+.lang-fields .lang-field > .lang-field-label {
+  width: fit-content;
+  max-width: 100%;
+  cursor: default;
+  user-select: none;
+}
+
+/* Switch languages + Clear cache — 1.9rem tall to match .switch; base fill reads like an “on” toggle track */
+.btn-toolbar-pill {
   flex-shrink: 0;
   margin: 0;
-  padding: 0.22rem 0.55rem 0.24rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  min-height: 1.9rem;
+  height: 1.9rem;
+  padding: 0 0.65rem;
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.02em;
   line-height: 1.2;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 153, 51, 0.42);
-  background: linear-gradient(165deg, rgba(255, 153, 51, 0.12), rgba(255, 153, 51, 0.04));
-  color: rgba(255, 176, 110, 0.95);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 153, 51, 0.34);
+  background: linear-gradient(
+    165deg,
+    rgba(255, 153, 51, 0.18) 0%,
+    rgba(255, 153, 51, 0.1) 38%,
+    rgba(28, 26, 24, 0.92) 100%
+  );
+  color: rgba(244, 236, 228, 0.96);
   cursor: pointer;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.05) inset,
-    0 2px 8px rgba(0, 0, 0, 0.28);
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 2px 6px rgba(0, 0, 0, 0.3);
   transition:
     background var(--vit-duration) var(--vit-ease),
     border-color var(--vit-duration) var(--vit-ease),
-    box-shadow var(--vit-duration) var(--vit-ease);
+    box-shadow var(--vit-duration) var(--vit-ease),
+    color var(--vit-duration) var(--vit-ease);
 }
 
-.btn-swap-icon {
-  font-size: 0.95rem;
-  line-height: 1;
-  opacity: 0.92;
-}
-
-.btn-swap:hover:not(:disabled) {
-  background: linear-gradient(165deg, rgba(255, 153, 51, 0.2), rgba(255, 153, 51, 0.08));
-  border-color: rgba(255, 153, 51, 0.55);
+.btn-toolbar-pill:hover:not(:disabled) {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 153, 51, 0.24) 0%,
+    rgba(255, 153, 51, 0.14) 42%,
+    rgba(34, 31, 28, 0.96) 100%
+  );
+  border-color: rgba(255, 153, 51, 0.45);
   color: var(--vit-text);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.07) inset,
-    0 3px 12px rgba(0, 0, 0, 0.35);
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 3px 10px rgba(0, 0, 0, 0.36);
 }
 
-.btn-swap:disabled {
+.btn-toolbar-pill:focus-visible {
+  outline: 2px solid var(--vit-ring);
+  outline-offset: 2px;
+}
+
+.btn-toolbar-pill:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.btn-toolbar-pill__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-toolbar-pill__icon--glyph {
+  font-size: 0.92rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.btn-toolbar-pill__svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .row--swap {
   margin: 0;
   align-items: center;
-  justify-content: flex-start;
 }
 
 .row--kbd {
@@ -235,23 +500,6 @@ body.vit-ui.vit-popup {
   border-radius: 4px;
 }
 
-.btn-clear-cache {
-  font-size: 12px;
-  font-weight: 650;
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 153, 51, 0.45);
-  background: rgba(0, 0, 0, 0.2);
-  color: rgba(255, 176, 110, 0.9);
-  cursor: pointer;
-}
-
-.btn-clear-cache:hover:not(:disabled) {
-  color: var(--vit-text);
-  border-color: rgba(255, 153, 51, 0.55);
-  background: rgba(255, 153, 51, 0.06);
-}
-
 .cache-legacy-hint {
   margin: 0;
   font-size: 12px;
@@ -268,7 +516,7 @@ body.vit-ui.vit-popup {
 .lang-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   margin: 0;
 }
 
@@ -468,6 +716,11 @@ body.vit-ui.vit-popup select.lang-select-native {
   gap: 18px;
 }
 
+/* Must come after `.row` — that rule was winning and kept the swap control left-aligned. */
+.row.row--swap {
+  justify-content: flex-end;
+}
+
 .toggle-panel {
   margin: 0;
   padding-top: 10px;
@@ -494,14 +747,6 @@ body.vit-ui.vit-popup select.lang-select-native {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-}
-
-.row--toggle-status .btn-clear-cache {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 650;
-  padding: 0.2rem 0.5rem;
-  line-height: 1.25;
 }
 
 .toggle-line-title {
@@ -539,8 +784,8 @@ body.vit-ui.vit-popup select.lang-select-native {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 1.9rem;
+  height: 1.9rem;
 }
 
 .toggle-loading[hidden] {
@@ -549,9 +794,9 @@ body.vit-ui.vit-popup select.lang-select-native {
 
 .toggle-loading-spinner {
   display: block;
-  width: 22px;
-  height: 22px;
-  border: 2.5px solid rgba(255, 153, 51, 0.2);
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid rgba(255, 153, 51, 0.2);
   border-top-color: var(--vit-accent);
   border-radius: 50%;
   animation: vit-spin 0.75s linear infinite;
@@ -563,11 +808,11 @@ body.vit-ui.vit-popup select.lang-select-native {
   }
 }
 
-/* Toggle switch */
+/* Toggle switch — 1.9rem track height to align with toolbar pills */
 .switch {
   position: relative;
-  width: 54px;
-  height: 32px;
+  width: 3.2rem;
+  height: 1.9rem;
   flex-shrink: 0;
 }
 
@@ -594,14 +839,15 @@ body.vit-ui.vit-popup select.lang-select-native {
 .slider::before {
   content: "";
   position: absolute;
-  height: 26px;
-  width: 26px;
+  width: calc(1.9rem - 6px);
+  height: calc(1.9rem - 6px);
   left: 3px;
   top: 50%;
   transform: translateY(-50%);
   background: #4a4540;
   border-radius: 50%;
   transition:
+    left var(--vit-duration) var(--vit-ease),
     transform var(--vit-duration) var(--vit-ease),
     background var(--vit-duration) var(--vit-ease),
     box-shadow var(--vit-duration) var(--vit-ease);
@@ -615,7 +861,8 @@ body.vit-ui.vit-popup select.lang-select-native {
 }
 
 .switch input:checked + .slider::before {
-  transform: translate(22px, -50%);
+  left: calc(100% - 3px);
+  transform: translate(-100%, -50%);
   background: linear-gradient(160deg, var(--vit-accent) 0%, var(--vit-accent-deep) 100%);
   box-shadow: 0 3px 14px rgba(255, 153, 51, 0.45);
 }
@@ -625,8 +872,8 @@ body.vit-ui.vit-popup select.lang-select-native {
   outline-offset: 3px;
 }
 
-.switch input:active + .slider::before {
-  transform: translate(22px, -50%) scale(0.94);
+.switch input:checked:active + .slider::before {
+  transform: translate(-100%, -50%) scale(0.94);
 }
 
 .switch input:not(:checked):active + .slider::before {
@@ -677,5 +924,25 @@ body.vit-ui.vit-popup select.lang-select-native {
     animation: none;
     border-top-color: var(--vit-accent);
     opacity: 0.85;
+  }
+
+  .libre-url-test-spinner {
+    animation: none;
+    border-top-color: var(--vit-accent);
+    opacity: 0.88;
+  }
+
+  .libre-url-test-btn[data-state="loading"] {
+    animation: none;
+  }
+
+  .libre-url-test-btn[data-state="success"] .libre-url-test-btn__success {
+    animation: none;
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .libre-url-test-btn[data-state="error"] {
+    animation: none;
   }
 }

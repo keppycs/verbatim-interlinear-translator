@@ -15,6 +15,7 @@ const loadingEl = document.getElementById("toggleLoading");
 const sourceLangEl = document.getElementById("sourceLang");
 const targetLangEl = document.getElementById("targetLang");
 const baseUrlEl = document.getElementById("libreTranslateBaseUrl");
+const libreUrlTestBtn = document.getElementById("libreUrlTestBtn");
 const swapLangEl = document.getElementById("swapLang");
 const useCacheEl = document.getElementById("useTranslationCache");
 const syncPageTranslationAcrossTabsEl = document.getElementById("syncPageTranslationAcrossTabs");
@@ -34,6 +35,7 @@ function resyncLanguageSelectUis() {
 }
 
 const NO_TARGET_MESSAGE = "Choose a target language before translating";
+const NO_SOURCE_MESSAGE = "Choose a source language before translating";
 
 /** Popup has no scrollbars; keep strings short so they fit clipped message areas. */
 const POPUP_TEXT_SOFT_CAP = 420;
@@ -54,6 +56,8 @@ let lastLanguages = null;
 let tabStatePollTimer = null;
 
 let baseUrlDebounceTimer = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let libreUrlTestResetTimer = null;
 
 /**
  * Injected when `tabs.sendMessage` fails (content script not ready / no receiver).
@@ -384,6 +388,7 @@ function formatToggleError(res) {
   const e = res?.error;
   if (e === "translation_mismatch") return "Translation could not be completed. Try again.";
   if (e === "no_target_language") return NO_TARGET_MESSAGE;
+  if (e === "no_source_language") return NO_SOURCE_MESSAGE;
   if (e === "no_page_lang") {
     return 'This page needs <html lang="…"> when source is “Auto”, or pick a fixed source language.';
   }
@@ -476,12 +481,16 @@ function fixedSourceHasNonSelfTarget(languages, code) {
 
 /**
  * Fixed source options: only Libre `/languages` rows that have at least one non-self target.
- * The synthetic `auto` option is always first (see defaultSettings.sourceLang).
+ * Order: empty “Select language”, then `auto`, then fixed codes (see defaultSettings.sourceLang).
  * @param {Array<{ code: string; name: string; targets: string[] }>} languages
  */
 function rebuildSourceSelect(languages) {
   if (!sourceLangEl) return;
   sourceLangEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select language";
+  sourceLangEl.appendChild(placeholder);
   const autoOpt = document.createElement("option");
   autoOpt.value = "auto";
   autoOpt.textContent = "Auto";
@@ -540,14 +549,14 @@ async function refreshAutoSourceLabel(htmlPrimaryHint) {
   }
   const name = labelForAutoParenthetical(lastLanguages, primary);
   const canUseAsSource = fixedSourceHasNonSelfTarget(lastLanguages, primary);
-  setAutoSourceOptionLabel(canUseAsSource ? `Auto (${name})` : `Auto (${name} - unavailable)`);
+  setAutoSourceOptionLabel(canUseAsSource ? `Auto (${name})` : `Auto (${name} - unsupported)`);
 }
 
 /**
  * Target options: placeholder first, then only that source row’s `targets` (no global union).
  * For `auto`, the concrete source is the active tab’s &lt;html lang&gt; primary (same as content script).
  * @param {Array<{ code: string; name: string; targets: string[] }>} languages
- * @param {string} sourceValue - "auto" or a fixed source code (must match the source &lt;select&gt; value)
+ * @param {string} sourceValue - "", "auto", or a fixed source code (must match the source &lt;select&gt; value)
  * @param {string} [preferredTarget] - if set, prefer this value when still valid (e.g. from storage)
  * @param {string | null | undefined} [htmlPrimaryHint] - for `auto` only: when set (including null), skips GET_HTML_LANG
  */
@@ -559,7 +568,12 @@ async function rebuildTargetSelect(languages, sourceValue, preferredTarget, html
   placeholder.value = "";
   placeholder.textContent = "Select language";
   targetLangEl.appendChild(placeholder);
-  const src = (sourceValue || "auto").trim();
+  const src = (sourceValue ?? "").trim();
+  if (!src) {
+    targetLangEl.value = "";
+    resyncTargetSelectUi();
+    return;
+  }
   let codes;
   if (src === "auto") {
     let primary = htmlPrimaryHint;
@@ -603,15 +617,17 @@ function applyLanguageValuesFromStorage(opts = {}) {
     chrome.storage.sync.get(["sourceLang", "targetLang"], (stored) => {
       const merged = { ...defaultSettings, ...stored };
       const fromStorage =
-        merged.sourceLang && merged.sourceLang !== "" ? merged.sourceLang : "auto";
+        typeof merged.sourceLang === "string"
+          ? merged.sourceLang.trim()
+          : defaultSettings.sourceLang;
       const rawTarget = typeof merged.targetLang === "string" ? merged.targetLang.trim() : "";
       const optionValues = [...sourceLangEl.options].map((o) => o.value);
-      const src = pickSourceLangValue(optionValues, preferSource, fromStorage);
-      sourceLangEl.value = src;
-      resyncSourceSelectUi();
       const preferredTarget = preferTarget || rawTarget;
       void (async () => {
         const primaryHint = await getHtmlLangPrimaryForActiveTab();
+        const src = pickSourceLangValue(optionValues, preferSource, fromStorage, primaryHint);
+        sourceLangEl.value = src;
+        resyncSourceSelectUi();
         await rebuildTargetSelect(lastLanguages, sourceLangEl.value, preferredTarget, primaryHint);
         await refreshAutoSourceLabel(primaryHint);
         resolve();
@@ -673,6 +689,55 @@ async function refreshLanguagesUi() {
     if (swapLangEl) swapLangEl.disabled = true;
     setLanguagesError(e?.message || String(e));
     resyncLanguageSelectUis();
+  }
+}
+
+function clearLibreUrlTestResetTimer() {
+  if (libreUrlTestResetTimer != null) {
+    clearTimeout(libreUrlTestResetTimer);
+    libreUrlTestResetTimer = null;
+  }
+}
+
+/**
+ * @param {"idle" | "loading" | "success" | "error"} state
+ */
+function setLibreUrlTestState(state) {
+  if (!libreUrlTestBtn) return;
+  libreUrlTestBtn.dataset.state = state;
+  libreUrlTestBtn.disabled = state === "loading";
+  libreUrlTestBtn.setAttribute("aria-busy", state === "loading" ? "true" : "false");
+}
+
+function maybeResetLibreUrlTestAfterUrlEdit() {
+  const s = libreUrlTestBtn?.dataset.state;
+  if (s === "success" || s === "error") {
+    clearLibreUrlTestResetTimer();
+    setLibreUrlTestState("idle");
+  }
+}
+
+async function runLibreUrlConnectionTest() {
+  if (!libreUrlTestBtn || !baseUrlEl) return;
+  const raw = (baseUrlEl.value || "").trim();
+  if (!raw) {
+    setLanguagesError("Enter a LibreTranslate host first.");
+    clearLibreUrlTestResetTimer();
+    setLibreUrlTestState("error");
+    libreUrlTestResetTimer = setTimeout(() => setLibreUrlTestState("idle"), 1500);
+    return;
+  }
+  clearLibreUrlTestResetTimer();
+  setLibreUrlTestState("loading");
+  try {
+    await fetchLanguagesFromSw(raw);
+    setLibreUrlTestState("success");
+    libreUrlTestResetTimer = setTimeout(() => setLibreUrlTestState("idle"), 2400);
+    await refreshLanguagesUi();
+  } catch (e) {
+    setLibreUrlTestState("error");
+    setLanguagesError(e?.message || String(e));
+    libreUrlTestResetTimer = setTimeout(() => setLibreUrlTestState("idle"), 1700);
   }
 }
 
@@ -777,16 +842,25 @@ function saveLanguagesPartial(patch) {
 
 /**
  * Prefer UI selection when still valid (fixes stale sync before storage.write finishes).
+ * When storage is `auto` but the tab has no usable &lt;html lang&gt;, show empty (Select language).
  * @param {string[]} optionValues
  * @param {string} prefer
  * @param {string} fromStorage
+ * @param {string | null} primaryHint - primary subtag from the active tab (null = none)
  */
-function pickSourceLangValue(optionValues, prefer, fromStorage) {
+function pickSourceLangValue(optionValues, prefer, fromStorage, primaryHint) {
   const p = (prefer || "").trim();
   if (p && optionValues.includes(p)) return p;
-  const s = (fromStorage || "").trim() || "auto";
-  if (optionValues.includes(s)) return s;
-  return "auto";
+  const s = (fromStorage || "").trim();
+  if (s && s !== "auto" && optionValues.includes(s)) return s;
+  if (s === "" && optionValues.includes("")) return "";
+  if (s === "auto") {
+    if (!primaryHint) return optionValues.includes("") ? "" : "auto";
+    return optionValues.includes("auto") ? "auto" : "";
+  }
+  if (optionValues.includes("")) return "";
+  if (optionValues.includes("auto")) return "auto";
+  return optionValues[0] ?? "";
 }
 
 /** Apply tab snapshot from session storage or a GET_PAGE_TRANSLATION_STATE response. */
@@ -890,6 +964,7 @@ async function loadSettingsIntoForm() {
 }
 
 baseUrlEl?.addEventListener("input", () => {
+  maybeResetLibreUrlTestAfterUrlEdit();
   clearTimeout(baseUrlDebounceTimer);
   baseUrlDebounceTimer = setTimeout(() => {
     const v = stripLibreTranslateHostForStorage(baseUrlEl.value);
@@ -898,9 +973,14 @@ baseUrlEl?.addEventListener("input", () => {
 });
 
 baseUrlEl?.addEventListener("blur", () => {
+  maybeResetLibreUrlTestAfterUrlEdit();
   const v = stripLibreTranslateHostForStorage(baseUrlEl.value);
   baseUrlEl.value = v;
   chrome.storage.sync.set({ libreTranslateBaseUrl: v }, () => void refreshLanguagesUi());
+});
+
+libreUrlTestBtn?.addEventListener("click", () => {
+  void runLibreUrlConnectionTest();
 });
 
 useCacheEl?.addEventListener("change", () => {
@@ -927,7 +1007,7 @@ sourceLangEl?.addEventListener("change", () => {
   setPopupError("");
   const prev = targetLangEl?.value || "";
   void (async () => {
-    const v = (sourceLangEl.value || "auto").trim();
+    const v = sourceLangEl.value.trim();
     const primaryHint = await getHtmlLangPrimaryForActiveTab();
     await rebuildTargetSelect(lastLanguages, v, prev, primaryHint);
     await refreshAutoSourceLabel(primaryHint);
@@ -944,17 +1024,25 @@ targetLangEl?.addEventListener("change", () => {
 
 swapLangEl?.addEventListener("click", () => {
   if (!lastLanguages || !sourceLangEl || !targetLangEl) return;
-  const src = sourceLangEl.value;
+  const src = sourceLangEl.value.trim();
   const tgt = targetLangEl.value.trim();
-  let patch;
-  if (src === "auto") {
-    if (!tgt) return;
-    patch = { sourceLang: tgt, targetLang: "" };
-  } else {
-    if (!tgt) return;
-    patch = { sourceLang: tgt, targetLang: src };
-  }
+  if (!tgt || src === "") return;
   void (async () => {
+    let patch;
+    if (src === "auto") {
+      const primaryHint = await getHtmlLangPrimaryForActiveTab();
+      const canUse =
+        primaryHint && fixedSourceHasNonSelfTarget(lastLanguages, primaryHint);
+      const row = primaryHint ? findLanguageRow(lastLanguages, primaryHint) : null;
+      const concrete = row?.code || primaryHint || "";
+      if (canUse && concrete) {
+        patch = { sourceLang: tgt, targetLang: concrete };
+      } else {
+        patch = { sourceLang: tgt, targetLang: "" };
+      }
+    } else {
+      patch = { sourceLang: tgt, targetLang: src };
+    }
     await saveLanguagesPartial(patch);
     await applyLanguageValuesFromStorage();
   })();
@@ -1073,13 +1161,29 @@ toggleEl?.addEventListener("change", async () => {
     return;
   }
 
-  const langSnap = await chrome.storage.sync.get(["targetLang"]);
+  const langSnap = await chrome.storage.sync.get(["targetLang", "sourceLang"]);
   const target = (langSnap.targetLang ?? "").trim();
   if (!target) {
     toggleEl.checked = false;
     setSubtext(false);
     setPopupError(NO_TARGET_MESSAGE);
     return;
+  }
+  const sourceRaw = (langSnap.sourceLang ?? "").trim();
+  if (!sourceRaw) {
+    toggleEl.checked = false;
+    setSubtext(false);
+    setPopupError(NO_SOURCE_MESSAGE);
+    return;
+  }
+  if (sourceRaw === "auto") {
+    const primary = await getHtmlLangPrimaryForActiveTab();
+    if (!primary) {
+      toggleEl.checked = false;
+      setSubtext(false);
+      setPopupError(formatToggleError({ error: "no_page_lang" }));
+      return;
+    }
   }
 
   let pref;
