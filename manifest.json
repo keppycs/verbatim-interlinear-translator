@@ -2,12 +2,12 @@
   "manifest_version": 3,
   "name": "Verbatim Interlinear Translator",
   "version": "0.4.0",
-  "description": "Word-by-word interlinear translation injected into page HTML.",
+  "description": "Word-by-word interlinear glosses with full-sentence translation lines injected into webpages.",
   "icons": {
-    "16": "logo.png",
-    "32": "logo.png",
-    "48": "logo.png",
-    "128": "logo.png"
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
   },
   "minimum_chrome_version": "88",
   "permissions": ["storage", "activeTab", "tabs", "contextMenus", "scripting"],
@@ -20,8 +20,8 @@
     "default_title": "Verbatim Interlinear - toggle whole-page translation",
     "default_popup": "popup/popup.html",
     "default_icon": {
-      "16": "logo.png",
-      "32": "logo.png"
+      "16": "assets/icons/icon16.png",
+      "32": "assets/icons/icon32.png"
     }
   },
   "commands": {
